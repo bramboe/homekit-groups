@@ -12,7 +12,7 @@ else
 fi
 
 TARGET="${CONFIG}/custom_components/homekit_architect"
-SOURCE="/data/integration/homekit_architect"
+SOURCE="/usr/share/homekit_architect/homekit_architect"
 
 mkdir -p "${CONFIG}/custom_components"
 rm -rf "${TARGET}"
