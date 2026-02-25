@@ -66,6 +66,7 @@ HTML_PAGE = """<!DOCTYPE html>
     h1 { font-size: 22px; margin: 0 0 8px 0; }
     .card { background: var(--ha-card-background); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
     p { margin: 0 0 12px 0; color: #b0b0b0; font-size: 14px; }
+    .muted { font-size: 13px; color: #888; margin-bottom: 16px; }
     .status { font-size: 13px; padding: 12px; border-radius: 6px; margin: 12px 0; background: rgba(0,0,0,0.2); }
     .status.ok { border-left: 4px solid var(--success); }
     .status.warn { border-left: 4px solid #ff9800; }
@@ -84,11 +85,13 @@ HTML_PAGE = """<!DOCTYPE html>
 <body>
   <div class="card">
     <h1>HomeKit Entity Architect</h1>
-    <p>Add-on configuration. Use this page to reinstall the integration or open the main configuration panel.</p>
+    <p>Add-on configuration. Reinstall the integration here or open the main configuration panel.</p>
+    <p class="muted">Home Assistant loads custom integrations only at startup, so after the first install (or after an update) you need to restart HA once so it picks up the files. This is how all custom integrations work. Then the add-on and integration work without further restarts.</p>
     <div id="status" class="status"></div>
     <div id="message"></div>
     <button id="reinstall" class="btn btn-primary">Reinstall integration</button>
     <a href="/config/homekit-architect" class="btn btn-secondary">Open configuration panel</a>
+    <a href="/config/server_control" class="btn btn-secondary">Restart Home Assistant</a>
   </div>
   <script>
     const statusEl = document.getElementById('status');
@@ -126,7 +129,7 @@ HTML_PAGE = """<!DOCTYPE html>
         .then(r => r.json())
         .then(d => {
           if (d.ok) {
-            setMessage(d.message || 'Integration reinstalled. Restart Home Assistant to load changes.', 'success');
+            setMessage(d.message || 'Integration reinstalled. Use "Restart Home Assistant" below to load changes.', 'success');
             loadStatus();
           } else {
             setMessage(d.error || 'Reinstall failed.', 'error');
