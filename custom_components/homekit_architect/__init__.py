@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
+from homeassistant.components import frontend
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -16,12 +19,35 @@ from .const import (
     TEMPLATES,
 )
 from .bridge import async_apply_ghosting, async_remove_ghosting
+from .websocket_api import async_register_websocket_handlers
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
-    """Set up the HomeKit Entity Architect integration (no global config)."""
+    """Set up the HomeKit Entity Architect integration (panel + WebSocket API)."""
+    async_register_websocket_handlers(hass)
+
+    # Serve panel static files and register the config panel
+    frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
+    if os.path.isdir(frontend_path):
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(f"/{DOMAIN}_panel", frontend_path, False)]
+        )
+        await frontend.async_register_built_in_panel(
+            hass,
+            component_name="custom",
+            sidebar_title="HomeKit Architect",
+            sidebar_icon="mdi:apple-homekit",
+            frontend_url_path="homekit-architect",
+            config={
+                "_panel_custom": {
+                    "name": "homekit-architect-panel",
+                    "module_url": f"/{DOMAIN}_panel/homekit-architect.js",
+                },
+            },
+            require_admin=True,
+        )
     return True
 
 
