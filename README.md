@@ -66,6 +66,7 @@ The panel talks to the integration via the WebSocket API (`homekit_architect/lis
 
 ## Technical notes
 
+- **Versioning:** When releasing changes, bump the version in all three places: `custom_components/homekit_architect/manifest.json`, `homekit_architect/integration/homekit_architect/manifest.json`, and `homekit_architect/config.yaml` (add-on). Keep them in sync.
 - The integration uses the same entity filter mechanism as the core HomeKit integration: it adds slot entity IDs to the bridge’s **exclude** list and the virtual Architect entity to the **include** list, then reloads the bridge.
 - Virtual entities are registered with a stable `unique_id` so they survive renames in the entity registry.
 - This repo is an **add-on repository**: the add-on installs the integration into your config; the integration runs inside Home Assistant and depends on the built-in **HomeKit** integration.
