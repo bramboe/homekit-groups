@@ -26,6 +26,13 @@ When you **Start** the add-on, it writes the integration into your config folder
 
 Update the add-on from the Add-on store, then **Start** it again to overwrite the integration files. Restart Home Assistant to load the new version.
 
+## Safari: “Sheet constructor document doesn’t match adoptedStyleSheets”
+
+On **Safari** (especially 26.x), opening the panel can trigger a frontend error from Home Assistant’s Lit-based UI. This comes from the HA frontend, not from this integration.
+
+- **Workaround:** Use **Chrome** or **Firefox** to open the HomeKit Architect panel.
+- If you enable **embed_iframe** (the integration does this by default), the panel may load in an iframe and avoid the issue on some setups.
+
 ## Troubleshooting: panel shows a blank screen
 
 1. **Restart Home Assistant** after installing or updating the integration, then do a **hard refresh** in the browser (Ctrl+Shift+R or Cmd+Shift+R).
