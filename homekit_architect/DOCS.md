@@ -26,6 +26,17 @@ When you **Start** the add-on, it writes the integration into your config folder
 
 Update the add-on from the Add-on store, then **Start** it again to overwrite the integration files. Restart Home Assistant to load the new version.
 
+## Troubleshooting: panel shows a blank screen
+
+1. **Restart Home Assistant** after installing or updating the integration, then do a **hard refresh** in the browser (Ctrl+Shift+R or Cmd+Shift+R).
+2. **Test if the panel script loads:** open  
+   `http://YOUR_HA:8123/homekit_architect_panel/debug.html`  
+   in your browser (replace YOUR_HA with your Home Assistant host, e.g. `homeassistant.local`).  
+   - If you see "HomeKit Accessory Architect" and a bridge dropdown or an error message, the script works; the sidebar panel may be a cache or frontend issue.  
+   - If that page is also blank or shows a 404, the integration may not be loaded: add it via **Settings** → **Devices & services** → **Add integration** → **HomeKit Entity Architect**, then restart HA.
+3. Check the **browser console** (F12 → Console) on `/config/homekit-architect` for script or network errors.
+4. In **Settings** → **System** → **Logs**, look for a line like `HomeKit Architect: registering panel; script at ...` to confirm the integration started.
+
 ## Requirements
 
 - Home Assistant OS or Supervised installation (so the add-on can access the config directory).
