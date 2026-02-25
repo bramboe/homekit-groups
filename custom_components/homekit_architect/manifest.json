@@ -1,0 +1,12 @@
+{
+  "domain": "homekit_architect",
+  "name": "HomeKit Entity Architect",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["homekit"],
+  "documentation": "https://github.com/Homekit-Groups/Homekit-Groups",
+  "integration_type": "helper",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Homekit-Groups/Homekit-Groups/issues",
+  "version": "1.0.0"
+}
