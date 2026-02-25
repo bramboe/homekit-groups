@@ -21,7 +21,17 @@ A **Home Assistant Integration** that acts as a **Virtual Accessory Builder** fo
 
 *(Alternative: copy the `custom_components/homekit_architect` folder into your `config/custom_components/` directory, then restart and add the integration as above.)*
 
-## Setup flow
+## Configuration Panel
+
+After the integration is loaded, a **HomeKit Architect** item appears in the sidebar (or open **/config/homekit-architect**). The panel lets you:
+
+- **Bridge selection** – Choose an active HomeKit Bridge from a dropdown (from the Config Entry registry).
+- **Bridge Inspector (Phase 1)** – See that bridge’s current include/exclude filter and a **live list of entities** exposed by it.
+- **Multi-select and “Package as Accessory” (Phases 2–3)** – Planned: search/filter entities, multi-select, then name the accessory, choose type (Lock, Cover, Fan, etc.), map entities to slots, and create the virtual entity with optional **“Hide source entities from HomeKit”** (ghosting).
+
+The panel talks to the integration via the WebSocket API (`homekit_architect/list_bridges`, `homekit_architect/bridge_entities`, `homekit_architect/package_accessory`). You can still add and manage accessories via **Settings → Devices & services → Add integration → HomeKit Entity Architect**.
+
+## Setup flow (Add integration wizard)
 
 1. **Template** – Choose the functional type (e.g. Security Accessory / Smart Lock, Garage Door).
 2. **Slots** – Assign entities to each slot (e.g. lock actuator, door contact, battery sensor, obstruction sensor). Required slots must be filled.
