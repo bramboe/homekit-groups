@@ -20,6 +20,7 @@ cp -r "${SOURCE}" "${TARGET}"
 
 echo "[HomeKit Entity Architect] Integration installed to ${TARGET}"
 echo "[HomeKit Entity Architect] Restart Home Assistant to load the integration."
-echo "[HomeKit Entity Architect] Then: Settings → Devices & services → Add integration → HomeKit Entity Architect."
+echo "[HomeKit Entity Architect] Open the add-on Web UI for configuration."
 
-exit 0
+# Run config server for ingress (keeps container running)
+exec python3 /server.py
