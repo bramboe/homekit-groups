@@ -1,4 +1,4 @@
-"""HomeKit Entity Architect: group entities into a single HomeKit-compatible accessory."""
+"""HomeKit Entity Architect: app to group entities into HomeKit-compatible accessories."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_APPLY_GHOST_HIDE, CONF_BRIDGE_ID, CONF_MEMBER_ENTITIES, DOMAIN, HOMEKIT_DOMAIN
+from .const import CONF_GROUPS, DOMAIN, HOMEKIT_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,27 +54,27 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up HomeKit Entity Architect from a config entry."""
+    """Set up the app: one entry, platforms create entities from entry.data["groups"]."""
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
 
-    hass.data[DOMAIN][entry.entry_id] = entry.data
+    hass.data[DOMAIN][entry.entry_id] = entry
 
-    # Forward to platform(s) based on target domain
-    target = entry.data.get("target_domain", "fan")
-    platforms = [Platform.FAN] if target == "fan" else [Platform.FAN]
-    await hass.config_entries.async_forward_entry_setups(entry, platforms)
-
-    # Ghost method is applied from the fan platform in async_added_to_hass once entity_id is known.
+    # Load all supported platforms; each platform creates entities for its groups
+    await hass.config_entries.async_forward_entry_setups(
+        entry,
+        [Platform.FAN],
+    )
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
-    target = entry.data.get("target_domain", "fan")
-    platforms = [Platform.FAN] if target == "fan" else [Platform.FAN]
-    unload_ok = await hass.config_entries.async_unload_forward_entry_setups(entry, platforms)
+    """Unload the app entry."""
+    unload_ok = await hass.config_entries.async_unload_forward_entry_setups(
+        entry,
+        [Platform.FAN],
+    )
     if unload_ok and DOMAIN in hass.data:
         hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
