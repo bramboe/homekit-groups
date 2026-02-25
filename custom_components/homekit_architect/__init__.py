@@ -46,6 +46,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
                 "_panel_custom": {
                     "name": "homekit-architect-panel",
                     "js_url": panel_url,
+                    "embed_iframe": True,
                 },
             },
             require_admin=True,
