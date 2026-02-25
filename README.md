@@ -11,11 +11,15 @@ A **Home Assistant Integration** that acts as a **Virtual Accessory Builder** fo
   - The new virtual Architect entity is **included**.
   - The bridge is reloaded so Apple Home updates immediately.
 
-## Installation
+## Installation (Add-on repository)
 
-1. Copy the `custom_components/homekit_architect` folder into your Home Assistant `custom_components` directory (or add this repo as a custom repository and install via HACS if you later publish it).
-2. Restart Home Assistant.
-3. **Settings → Devices & Services → Add Integration** and search for **HomeKit Entity Architect**.
+1. In Home Assistant: **Settings** → **Add-ons** → **Add-on store** → **⋮** → **Repositories**.
+2. Add this repository URL: **`https://github.com/bramboe/homekit-groups`**
+3. Install the **HomeKit Entity Architect** add-on, then **Start** it.
+4. **Restart Home Assistant** (Settings → System → Restart).
+5. **Settings** → **Devices & services** → **Add integration** → search **HomeKit Entity Architect** and complete the setup.
+
+*(Alternative: copy the `custom_components/homekit_architect` folder into your `config/custom_components/` directory, then restart and add the integration as above.)*
 
 ## Setup flow
 
@@ -44,7 +48,7 @@ A **Home Assistant Integration** that acts as a **Virtual Accessory Builder** fo
 
 - The integration uses the same entity filter mechanism as the core HomeKit integration: it adds slot entity IDs to the bridge’s **exclude** list and the virtual Architect entity to the **include** list, then reloads the bridge.
 - Virtual entities are registered with a stable `unique_id` so they survive renames in the entity registry.
-- This is a **Home Assistant integration** (custom component), not a HASS add-on or HACS-specific package; it runs inside Home Assistant and depends on the built-in **HomeKit** integration.
+- This repo is an **add-on repository**: the add-on installs the integration into your config; the integration runs inside Home Assistant and depends on the built-in **HomeKit** integration.
 
 ## Requirements
 
