@@ -20,6 +20,8 @@ from .const import (
     TEMPLATES,
 )
 
+CONF_PANEL_PACKAGE = "panel_package"
+
 HOMEKIT_DOMAIN = "homekit"
 HOMEKIT_MODE_BRIDGE = "bridge"
 
@@ -43,7 +45,47 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
         self._slots: dict[str, str] = {}
         self._friendly_name: str = ""
 
+    async def async_step_panel(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Create an accessory from the Configuration Panel (no UI steps)."""
+        if user_input is None:
+            return self.async_abort(reason="invalid_panel_data")
+        template_id = user_input.get(CONF_TEMPLATE_ID)
+        slots = user_input.get(CONF_SLOTS) or {}
+        bridge_entry_id = user_input.get(CONF_HOMEKIT_BRIDGE_ENTRY_ID) or user_input.get("homekit_bridge_entry_id") or ""
+        automated_ghosting = user_input.get(CONF_AUTOMATED_GHOSTING, True)
+        friendly_name = (user_input.get(CONF_ARCHITECT_ENTITY_FRIENDLY_NAME) or "").strip()
+
+        if not template_id or template_id not in TEMPLATES:
+            return self.async_abort(reason="invalid_template")
+        template = TEMPLATES[template_id]
+        for req in template["required_slots"]:
+            if not slots.get(req):
+                return self.async_abort(reason="missing_required_slot")
+        if not bridge_entry_id:
+            return self.async_abort(reason="no_bridge")
+
+        title = friendly_name or template["name"]
+        data = {
+            CONF_TEMPLATE_ID: template_id,
+            CONF_SLOTS: slots,
+            CONF_HOMEKIT_BRIDGE_ENTRY_ID: bridge_entry_id,
+            CONF_AUTOMATED_GHOSTING: automated_ghosting,
+            CONF_ARCHITECT_ENTITY_FRIENDLY_NAME: title,
+        }
+        return self.async_create_entry(title=title, data=data)
+
     async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Template selection or, when launched from panel, create entry from panel data."""
+        if self.context.get("source") == "panel" and self.context.get("panel_package"):
+            panel_data = self.context.get("panel_data") or {}
+            return await self.async_step_panel(panel_data)
+        return await self._async_step_user_impl(user_input)
+
+    async def _async_step_user_impl(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Template selection."""
