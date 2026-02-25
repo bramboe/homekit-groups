@@ -1,0 +1,58 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Choose accessory type",
+        "description": "Select the type of HomeKit accessory to create from your entities.",
+        "data": {
+          "target_domain": "Accessory type"
+        }
+      },
+      "accessory_type": {
+        "title": "Choose accessory type",
+        "description": "Select the type of HomeKit accessory to create from your entities.",
+        "data": {
+          "target_domain": "Accessory type"
+        }
+      },
+      "entity_mapping": {
+        "title": "Map source entities",
+        "description": "Select which entities will power the virtual accessory.",
+        "data": {
+          "entity_name": "Name for the new entity",
+          "speed_entity": "Speed / percentage (light or fan)",
+          "battery_sensor": "Battery sensor (optional)"
+        },
+        "data_description": {
+          "battery_sensor": "Leave empty if not needed."
+        }
+      },
+      "bridge_selection": {
+        "title": "HomeKit Bridge",
+        "description": "Select the HomeKit Bridge that will expose this accessory.",
+        "data": {
+          "bridge_id": "HomeKit Bridge",
+          "apply_ghost_hide": "Apply Ghost Hide (exclude source entities from bridge)"
+        }
+      }
+    },
+    "abort": {
+      "no_bridges": "No HomeKit Bridge found. Add a HomeKit Bridge first.",
+      "already_configured": "This configuration already exists."
+    },
+    "error": {
+      "invalid_entity": "Please select a valid entity.",
+      "bridge_not_found": "Selected bridge could not be found."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HomeKit Entity Architect options",
+        "data": {
+          "apply_ghost_hide": "Apply Ghost Hide"
+        }
+      }
+    }
+  }
+}
