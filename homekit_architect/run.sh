@@ -20,6 +20,7 @@ cp -r "${SOURCE}" "${TARGET}"
 
 echo "[HomeKit Entity Architect] Integration installed to ${TARGET}"
 echo "[HomeKit Entity Architect] Restart Home Assistant to load the integration."
-echo "[HomeKit Entity Architect] Then: Settings → Devices & services → Add integration → HomeKit Entity Architect."
+echo "[HomeKit Entity Architect] Use the 'Open Web UI' button above to open the configuration screen."
 
-exit 0
+# Run ingress redirect server so "Open Web UI" sends users to the configuration panel
+exec python3 /ingress_redirect.py
