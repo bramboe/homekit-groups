@@ -2,35 +2,33 @@
  * HomeKit Accessory Architect - Configuration Panel
  * Endpoint: /config/homekit-architect
  * WebSocket: homekit_architect/list_bridges, bridge_entities, package_accessory
+ * Loaded as ES module by Home Assistant (module_url).
  */
-(function () {
-  const DOMAIN = "homekit_architect";
+const DOMAIN = "homekit_architect";
 
-  const ACCESSORY_TYPES = [
-    { value: "lock", label: "Smart Lock", template_id: "security_lock" },
-    { value: "cover", label: "Garage Door", template_id: "garage_door" },
-  ];
+const ACCESSORY_TYPES = [
+  { value: "lock", label: "Smart Lock", template_id: "security_lock" },
+  { value: "cover", label: "Garage Door", template_id: "garage_door" },
+];
 
-  const SLOTS_BY_TEMPLATE = {
-    security_lock: {
+const SLOTS_BY_TEMPLATE = {
+  security_lock: {
       action_slot: "Lock actuator (switch/lock)",
       state_slot: "State sensor (e.g. door contact)",
       battery_slot: "Battery (optional)",
-      obstruction_slot: "Obstruction/jam (optional)",
-    },
-    garage_door: {
-      actuator_slot: "Open/Close actuator",
-      position_sensor_slot: "Position sensor (door contact/cover)",
-      battery_slot: "Battery (optional)",
-    },
-  };
+    obstruction_slot: "Obstruction/jam (optional)",
+  },
+  garage_door: {
+    actuator_slot: "Open/Close actuator",
+    position_sensor_slot: "Position sensor (door contact/cover)",
+    battery_slot: "Battery (optional)",
+  },
+};
 
-  const ROOT_CLASS = "homekit-architect-root";
-
-  class HomeKitArchitectPanel extends HTMLElement {
+class HomeKitArchitectPanel extends HTMLElement {
     constructor() {
       super();
-      this._root = null;
+      this.attachShadow({ mode: "open" });
       this._hass = null;
       this._bridges = [];
       this._selectedBridgeId = null;
@@ -51,56 +49,32 @@
 
     set hass(hass) {
       this._hass = hass;
-      if (hass && !this._bridges.length) {
-        this._fetchBridges().catch((e) => {
-          this._error = e?.message || String(e);
-          this._loading = false;
-          this._renderSafe();
-        });
-      }
+      if (hass && !this._bridges.length) this._fetchBridges();
     }
 
     connectedCallback() {
-      this.innerHTML = "<div class=\"" + ROOT_CLASS + "\" style=\"display:block;padding:16px;font-family:var(--mdc-typography-font-family,Roboto,sans-serif);\"><h1>HomeKit Accessory Architect</h1><p>Loading…</p></div>";
-      this._root = this.querySelector("." + ROOT_CLASS);
-      this._renderSafe();
+      this._render();
     }
 
     async _wsSend(type, extra = {}) {
-      const conn = this._hass?.connection;
-      if (!conn) return null;
+      if (!this._hass?.connection) return null;
       return new Promise((resolve, reject) => {
         const id = Math.round(Math.random() * 1e9);
-        const payload = { type, id, ...extra };
-        const handler = (ev) => {
-          const msg = ev.detail !== undefined ? ev.detail : ev;
+        const handler = (msg) => {
           if (msg.id !== id) return;
-          conn.removeEventListener("message", handler);
-          clearTimeout(timer);
+          this._hass.connection.removeEventListener("message", handler);
           if (msg.type === "result" && msg.success) resolve(msg.result);
-          else reject(msg.error || { message: (msg.error && msg.error.message) || "Unknown error" });
+          else reject(msg.error || { message: msg.error?.message || "Unknown error" });
         };
-        conn.addEventListener("message", handler);
-        const timer = setTimeout(() => {
-          conn.removeEventListener("message", handler);
-          reject(new Error("WebSocket timeout"));
-        }, 15000);
-        if (typeof conn.sendMessagePromise === "function") {
-          conn.sendMessagePromise(payload).catch(reject);
-        } else if (typeof conn.sendMessage === "function") {
-          conn.sendMessage(payload);
-        } else {
-          clearTimeout(timer);
-          conn.removeEventListener("message", handler);
-          reject(new Error("No WebSocket send method"));
-        }
+        this._hass.connection.addEventListener("message", handler);
+        this._hass.connection.sendMessagePromise({ type, id, ...extra }).catch(reject);
       });
     }
 
     async _fetchBridges() {
       this._loading = true;
       this._error = null;
-      this._renderSafe();
+      this._render();
       try {
         const res = await this._wsSend(`${DOMAIN}/list_bridges`);
         this._bridges = res?.bridges || [];
@@ -108,7 +82,7 @@
         this._error = e?.message || String(e);
       }
       this._loading = false;
-      this._renderSafe();
+      this._render();
     }
 
     async _onBridgeChange(e) {
@@ -117,10 +91,10 @@
       this._entities = [];
       this._selectedIds.clear();
       this._error = null;
-      this._renderSafe();
+      this._render();
       if (!id) return;
       this._loading = true;
-      this._renderSafe();
+      this._render();
       try {
         const res = await this._wsSend(`${DOMAIN}/bridge_entities`, { bridge_entry_id: id });
         this._entities = res?.entities || [];
@@ -128,7 +102,7 @@
         this._error = err?.message || String(err);
       }
       this._loading = false;
-      this._renderSafe();
+      this._render();
     }
 
     _filteredEntities() {
@@ -155,26 +129,26 @@
 
     _onSearchInput(e) {
       this._search = e.target?.value || "";
-      this._renderSafe();
+      this._render();
     }
 
     _onDomainToggle(domain) {
       if (this._domainFilter.has(domain)) this._domainFilter.delete(domain);
       else this._domainFilter.add(domain);
-      this._renderSafe();
+      this._render();
     }
 
     _onEntityCheck(e, entityId) {
       if (e.target?.checked) this._selectedIds.add(entityId);
       else this._selectedIds.delete(entityId);
-      this._renderSafe();
+      this._render();
     }
 
     _onSelectAll(checked) {
       const list = this._filteredEntities();
       if (checked) list.forEach((e) => e.entity_id && this._selectedIds.add(e.entity_id));
       else list.forEach((e) => e.entity_id && this._selectedIds.delete(e.entity_id));
-      this._renderSafe();
+      this._render();
     }
 
     _openPackageModal() {
@@ -186,12 +160,12 @@
       this._packageSubmitting = false;
       this._error = null;
       this._success = null;
-      this._renderSafe();
+      this._render();
     }
 
     _closeModal() {
       this._modalOpen = false;
-      this._renderSafe();
+      this._render();
     }
 
     _suggestSlotMapping(accessoryType) {
@@ -222,7 +196,7 @@
     _onPackageTypeChange(e) {
       this._packageType = e.target?.value || "lock";
       this._packageSlotMapping = this._suggestSlotMapping(this._packageType);
-      this._renderSafe();
+      this._render();
     }
 
     async _submitPackage() {
@@ -232,7 +206,7 @@
       this._packageSubmitting = true;
       this._error = null;
       this._success = null;
-      this._renderSafe();
+      this._render();
       try {
         const res = await this._wsSend(`${DOMAIN}/package_accessory`, {
           bridge_entry_id: this._selectedBridgeId,
@@ -249,27 +223,24 @@
         this._error = err?.message || String(err);
       }
       this._packageSubmitting = false;
-      this._renderSafe();
-    }
-
-    _renderSafe() {
-      try {
-        this._render();
-      } catch (err) {
-        if (this._root) {
-          this._root.innerHTML = `
-            <h1>HomeKit Accessory Architect</h1>
-            <div class="error" style="padding:12px;background:rgba(244,67,54,0.1);color:#f44336;border-radius:4px;margin-top:12px;">
-              Panel error: ${String(err && err.message || err)}
-            </div>
-          `;
-        }
-      }
+      this._render();
     }
 
     _render() {
-      const root = this._root;
+      const root = this.shadowRoot;
       if (!root) return;
+
+      if (!this._hass) {
+        root.innerHTML = `
+          <style>
+            :host { display: block; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
+            .loading-msg { color: var(--secondary-text-color); padding: 24px; }
+          </style>
+          <h1>HomeKit Accessory Architect</h1>
+          <p class="loading-msg">Connecting to Home Assistant…</p>
+        `;
+        return;
+      }
 
       const bridge = this._bridges.find((b) => b.entry_id === this._selectedBridgeId);
       const filterInfo = bridge?.filter
@@ -283,35 +254,35 @@
 
       root.innerHTML = `
         <style>
-          .${ROOT_CLASS} { display: block; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
-          .${ROOT_CLASS} h1 { font-size: 24px; margin: 0 0 16px 0; }
-          .${ROOT_CLASS} .card { background: var(--ha-card-background, var(--card-background-color, #1c1c1c)); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-          .${ROOT_CLASS} select, .${ROOT_CLASS} input[type="text"] { width: 100%; max-width: 400px; padding: 8px 12px; font-size: 14px; border-radius: 4px; margin-bottom: 8px; box-sizing: border-box; }
-          .${ROOT_CLASS} .loading, .${ROOT_CLASS} .error, .${ROOT_CLASS} .success { padding: 12px; margin: 8px 0; border-radius: 4px; }
-          .${ROOT_CLASS} .loading { background: rgba(255,152,0,0.1); color: var(--primary-color, #ff9800); }
-          .${ROOT_CLASS} .error { background: rgba(244,67,54,0.1); color: var(--error-color, #f44336); }
-          .${ROOT_CLASS} .success { background: rgba(76,175,80,0.1); color: var(--success-color, #4caf50); }
-          .${ROOT_CLASS} .filter-info { font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
-          .${ROOT_CLASS} .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
-          .${ROOT_CLASS} .toolbar input[type="text"] { max-width: 240px; margin: 0; }
-          .${ROOT_CLASS} .domain-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-          .${ROOT_CLASS} .domain-chip { padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; background: var(--secondary-background-color, #2c2c2c); }
-          .${ROOT_CLASS} .domain-chip.active { background: var(--primary-color, #03a9f4); color: #fff; }
-          .${ROOT_CLASS} ul { list-style: none; padding: 0; margin: 0; max-height: 360px; overflow-y: auto; }
-          .${ROOT_CLASS} li { padding: 8px 12px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.12)); display: flex; align-items: center; gap: 10px; }
-          .${ROOT_CLASS} li label { flex: 1; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-          .${ROOT_CLASS} li .domain { font-size: 11px; opacity: 0.8; margin-right: 8px; }
-          .${ROOT_CLASS} li .state { font-size: 12px; opacity: 0.9; }
-          .${ROOT_CLASS} .btn { padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; border: none; background: var(--primary-color, #03a9f4); color: #fff; }
-          .${ROOT_CLASS} .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-          .${ROOT_CLASS} .btn.secondary { background: var(--secondary-background-color, #2c2c2c); }
-          .${ROOT_CLASS} .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-          .${ROOT_CLASS} .modal { background: var(--ha-card-background, #1c1c1c); border-radius: 12px; padding: 24px; max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto; }
-          .${ROOT_CLASS} .modal h2 { margin: 0 0 16px 0; font-size: 20px; }
-          .${ROOT_CLASS} .modal .field { margin-bottom: 14px; }
-          .${ROOT_CLASS} .modal .field label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--secondary-text-color); }
-          .${ROOT_CLASS} .modal .actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
-          .${ROOT_CLASS} .modal select.slot { width: 100%; max-width: none; margin-top: 4px; }
+          :host { display: block; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
+          h1 { font-size: 24px; margin: 0 0 16px 0; }
+          .card { background: var(--ha-card-background, var(--card-background-color, #1c1c1c)); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+          select, input[type="text"] { width: 100%; max-width: 400px; padding: 8px 12px; font-size: 14px; border-radius: 4px; margin-bottom: 8px; box-sizing: border-box; }
+          .loading, .error, .success { padding: 12px; margin: 8px 0; border-radius: 4px; }
+          .loading { background: rgba(255,152,0,0.1); color: var(--primary-color, #ff9800); }
+          .error { background: rgba(244,67,54,0.1); color: var(--error-color, #f44336); }
+          .success { background: rgba(76,175,80,0.1); color: var(--success-color, #4caf50); }
+          .filter-info { font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
+          .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+          .toolbar input[type="text"] { max-width: 240px; margin: 0; }
+          .domain-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+          .domain-chip { padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; background: var(--secondary-background-color, #2c2c2c); }
+          .domain-chip.active { background: var(--primary-color, #03a9f4); color: #fff; }
+          ul { list-style: none; padding: 0; margin: 0; max-height: 360px; overflow-y: auto; }
+          li { padding: 8px 12px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.12)); display: flex; align-items: center; gap: 10px; }
+          li label { flex: 1; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+          li .domain { font-size: 11px; opacity: 0.8; margin-right: 8px; }
+          li .state { font-size: 12px; opacity: 0.9; }
+          .btn { padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; border: none; background: var(--primary-color, #03a9f4); color: #fff; }
+          .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+          .btn.secondary { background: var(--secondary-background-color, #2c2c2c); }
+          .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+          .modal { background: var(--ha-card-background, #1c1c1c); border-radius: 12px; padding: 24px; max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto; }
+          .modal h2 { margin: 0 0 16px 0; font-size: 20px; }
+          .modal .field { margin-bottom: 14px; }
+          .modal .field label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--secondary-text-color); }
+          .modal .actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+          .modal select.slot { width: 100%; max-width: none; margin-top: 4px; }
         </style>
 
         <h1>HomeKit Accessory Architect</h1>
@@ -399,16 +370,16 @@
         ` : ""}
       `;
 
-      const sel = root.querySelector("#bridge-select");
+      const sel = root.getElementById("bridge-select");
       if (sel) sel.addEventListener("change", (e) => this._onBridgeChange(e));
-      const searchInput = root.querySelector("#search-input");
+      const searchInput = root.getElementById("search-input");
       if (searchInput) searchInput.addEventListener("input", (e) => this._onSearchInput(e));
-      const selectAll = root.querySelector("#select-all");
+      const selectAll = root.getElementById("select-all");
       if (selectAll) {
         selectAll.checked = filtered.length > 0 && filtered.every((e) => this._selectedIds.has(e.entity_id));
         selectAll.addEventListener("change", (e) => this._onSelectAll(e.target?.checked));
       }
-      const btnPackage = root.querySelector("#btn-package");
+      const btnPackage = root.getElementById("btn-package");
       if (btnPackage) btnPackage.addEventListener("click", () => this._openPackageModal());
       root.querySelectorAll(".domain-chip").forEach((el) => {
         el.addEventListener("click", () => this._onDomainToggle(el.getAttribute("data-domain")));
@@ -419,17 +390,17 @@
       });
 
       if (this._modalOpen) {
-        const displayNameEl = root.querySelector("#modal-display-name");
+        const displayNameEl = root.getElementById("modal-display-name");
         if (displayNameEl) {
           displayNameEl.value = this._packageDisplayName;
           displayNameEl.addEventListener("input", (e) => { this._packageDisplayName = e.target?.value || ""; });
         }
-        const typeEl = root.querySelector("#modal-type");
+        const typeEl = root.getElementById("modal-type");
         if (typeEl) {
           typeEl.value = this._packageType;
           typeEl.addEventListener("change", (e) => this._onPackageTypeChange(e));
         }
-        const hideEl = root.querySelector("#modal-hide-sources");
+        const hideEl = root.getElementById("modal-hide-sources");
         if (hideEl) {
           hideEl.checked = this._packageHideSources;
           hideEl.addEventListener("change", (e) => { this._packageHideSources = e.target?.checked; });
@@ -443,9 +414,9 @@
             });
           }
         });
-        root.querySelector("#modal-backdrop")?.addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") this._closeModal(); });
-        root.querySelector("#modal-cancel")?.addEventListener("click", () => this._closeModal());
-        root.querySelector("#modal-submit")?.addEventListener("click", () => this._submitPackage());
+        root.getElementById("modal-backdrop")?.addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") this._closeModal(); });
+        root.getElementById("modal-cancel")?.addEventListener("click", () => this._closeModal());
+        root.getElementById("modal-submit")?.addEventListener("click", () => this._submitPackage());
       }
     }
 
@@ -458,4 +429,5 @@
   }
 
   customElements.define("homekit-architect-panel", HomeKitArchitectPanel);
-})();
+
+export default HomeKitArchitectPanel;
