@@ -1,6 +1,9 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
+# Python for the add-on config server (ingress)
+RUN apk add --no-cache python3
+
 # Copy bundled integration into image (not under /data: Supervisor mounts /data for persistent storage and overwrites it)
 COPY integration/ /usr/share/homekit_architect/
 COPY run.sh /run.sh
