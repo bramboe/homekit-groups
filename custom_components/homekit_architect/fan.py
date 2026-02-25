@@ -1,4 +1,4 @@
-"""Virtual Fan platform for HomeKit Entity Architect."""
+"""Virtual Fan platform: one entity per fan-type accessory group."""
 
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ from .const import (
     CONF_APPLY_GHOST_HIDE,
     CONF_BRIDGE_ID,
     CONF_ENTITY_NAME,
+    CONF_GROUP_ID,
+    CONF_GROUPS,
     CONF_MEMBER_ENTITIES,
     FAN_SLOT_BATTERY,
     FAN_SLOT_SPEED,
@@ -35,8 +37,13 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the virtual fan from a config entry."""
-    async_add_entities([ArchitectFanEntity(config_entry)])
+    """Create one virtual fan entity per fan-type accessory group."""
+    groups = config_entry.data.get(CONF_GROUPS) or []
+    fan_groups = [g for g in groups if g.get("target_domain") == "fan"]
+    async_add_entities(
+        [ArchitectFanEntity(config_entry, g) for g in fan_groups],
+        update_before_add=True,
+    )
 
 
 def _normalize_percentage(state: str, attrs: dict) -> int:
@@ -59,23 +66,21 @@ class ArchitectFanEntity(FanEntity):
 
     _attr_has_entity_name = False
     _attr_should_poll = False
-    _attr_supported_features = FanEntityFeature.SET_SPEED | FanEntityFeature.TURN_ON | FanEntityFeature.TURN_OFF
+    _attr_supported_features = (
+        FanEntityFeature.SET_SPEED | FanEntityFeature.TURN_ON | FanEntityFeature.TURN_OFF
+    )
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize the architect fan."""
+    def __init__(self, config_entry: ConfigEntry, group: dict[str, Any]) -> None:
+        """Initialize from the app entry and one accessory group."""
         self._config_entry = config_entry
-        self._speed_entity_id: str | None = config_entry.data.get(CONF_MEMBER_ENTITIES, {}).get(
-            FAN_SLOT_SPEED
-        )
-        self._battery_entity_id: str | None = config_entry.data.get(CONF_MEMBER_ENTITIES, {}).get(
-            FAN_SLOT_BATTERY
-        ) or None
-        if not self._battery_entity_id:
-            self._battery_entity_id = None
+        self._group = group
+        members = group.get(CONF_MEMBER_ENTITIES) or {}
+        self._speed_entity_id: str | None = members.get(FAN_SLOT_SPEED)
+        self._battery_entity_id: str | None = members.get(FAN_SLOT_BATTERY) or None
 
-        name = config_entry.data.get(CONF_ENTITY_NAME) or "Architect Fan"
+        name = group.get(CONF_ENTITY_NAME) or "Accessory"
         self._attr_name = name
-        self._attr_unique_id = f"{config_entry.entry_id}_fan"
+        self._attr_unique_id = f"{config_entry.entry_id}_{group.get(CONF_GROUP_ID, '')}"
         self._attr_percentage = 0
         self._attr_available = True
 
@@ -95,7 +100,6 @@ class ArchitectFanEntity(FanEntity):
         """Run when entity is added: recover state and apply Ghost if enabled."""
         self._recover_state()
 
-        # Track source entity changes
         if self._speed_entity_id:
             self.async_on_remove(
                 async_track_state_change_event(
@@ -105,18 +109,18 @@ class ArchitectFanEntity(FanEntity):
                 )
             )
 
-        # Ghost method: update HomeKit bridge to exclude sources and include this entity
         if (
-            self._config_entry.data.get(CONF_APPLY_GHOST_HIDE)
-            and self._config_entry.data.get(CONF_BRIDGE_ID)
+            self._group.get(CONF_APPLY_GHOST_HIDE)
+            and self._group.get(CONF_BRIDGE_ID)
         ):
             from homekit_architect import async_update_homekit_bridge
 
-            bridge_id = self._config_entry.data[CONF_BRIDGE_ID]
-            members = self._config_entry.data.get(CONF_MEMBER_ENTITIES) or {}
+            bridge_id = self._group[CONF_BRIDGE_ID]
+            members = self._group.get(CONF_MEMBER_ENTITIES) or {}
             to_exclude = [e for e in members.values() if e]
-            to_include = [self.entity_id]
-            await async_update_homekit_bridge(self.hass, bridge_id, to_exclude, to_include)
+            await async_update_homekit_bridge(
+                self.hass, bridge_id, to_exclude, [self.entity_id]
+            )
 
     @callback
     def _handle_speed_change(self, event) -> None:
@@ -138,7 +142,7 @@ class ArchitectFanEntity(FanEntity):
         preset_mode: str | None = None,
         **kwargs: Any,
     ) -> None:
-        """Turn on the fan or set percentage."""
+        """Turn on the accessory or set percentage."""
         if not self._speed_entity_id:
             return
         if percentage is not None:
@@ -154,7 +158,7 @@ class ArchitectFanEntity(FanEntity):
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn off the fan."""
+        """Turn off the accessory."""
         if not self._speed_entity_id:
             return
         await self.hass.services.async_call(
@@ -167,7 +171,7 @@ class ArchitectFanEntity(FanEntity):
         self.async_write_ha_state()
 
     async def async_set_percentage(self, percentage: int) -> None:
-        """Set fan speed percentage (maps to light brightness or fan percentage)."""
+        """Set speed percentage (maps to light brightness or fan percentage)."""
         if not self._speed_entity_id:
             return
         state = self.hass.states.get(self._speed_entity_id)
