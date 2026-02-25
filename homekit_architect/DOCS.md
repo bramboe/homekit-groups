@@ -13,7 +13,10 @@ This add-on **installs** the HomeKit Entity Architect integration into your Home
 
 ## Configuration screen
 
-The add-on’s **Configuration** tab has no options (by design). To configure devices and package entities into accessories, use the **Open Web UI** button on the add-on’s **Info** tab. That opens the integration’s configuration panel (same as **Settings** → **Sidebar** → **HomeKit Architect**).
+The add-on’s **Configuration** tab has no options (by design). To configure devices and package entities into accessories:
+
+- **Open Web UI** on the add-on’s **Info** tab should take you to the HomeKit Architect panel. If it only opens the main Home Assistant screen, use the sidebar instead.
+- **Sidebar:** open **Settings** (or **Developer tools**) and click **HomeKit Architect** in the sidebar, or go directly to **Settings** → **Devices & services** → **Integrations** and open **HomeKit Entity Architect**.
 
 ## What it does
 
