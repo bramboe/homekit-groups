@@ -94,13 +94,15 @@ HTML_PAGE = """<!DOCTYPE html>
     const statusEl = document.getElementById('status');
     const messageEl = document.getElementById('message');
     const reinstallBtn = document.getElementById('reinstall');
+    // Ingress serves at e.g. /api/hassio_ingress/XXX/ – use relative URLs so fetch hits the add-on
+    const base = document.location.pathname.replace(/\/?$/, '/');
 
     function setMessage(text, type) {
       messageEl.innerHTML = text ? '<div class="msg ' + type + '">' + text + '</div>' : '';
     }
 
     function loadStatus() {
-      fetch('/status').then(r => r.json()).then(d => {
+      fetch(base + 'status').then(r => r.json()).then(d => {
         if (d.installed) {
           statusEl.className = 'status ok';
           statusEl.innerHTML = 'Integration installed at <code>' + d.target + '</code>';
@@ -120,7 +122,7 @@ HTML_PAGE = """<!DOCTYPE html>
     reinstallBtn.addEventListener('click', function() {
       reinstallBtn.disabled = true;
       setMessage('', '');
-      fetch('/reinstall', { method: 'POST' })
+      fetch(base + 'reinstall', { method: 'POST' })
         .then(r => r.json())
         .then(d => {
           if (d.ok) {
