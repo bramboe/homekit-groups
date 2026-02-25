@@ -1,0 +1,5 @@
+# Home Assistant Add-on Repository
+# Add this URL in: Settings → Add-ons → Add-on store → ⋮ → Repositories
+name: HomeKit Entity Architect
+url: https://github.com/bramboe/homekit-groups
+maintainer: Bram Boersma
