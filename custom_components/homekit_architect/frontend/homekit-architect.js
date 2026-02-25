@@ -49,7 +49,13 @@
 
     set hass(hass) {
       this._hass = hass;
-      if (hass && !this._bridges.length) this._fetchBridges();
+      if (hass && !this._bridges.length) {
+        this._fetchBridges().catch((e) => {
+          this._error = e?.message || String(e);
+          this._loading = false;
+          this._render();
+        });
+      }
     }
 
     connectedCallback() {
@@ -57,17 +63,33 @@
     }
 
     async _wsSend(type, extra = {}) {
-      if (!this._hass?.connection) return null;
+      const conn = this._hass?.connection;
+      if (!conn) return null;
       return new Promise((resolve, reject) => {
         const id = Math.round(Math.random() * 1e9);
-        const handler = (msg) => {
+        const payload = { type, id, ...extra };
+        const handler = (ev) => {
+          const msg = ev.detail !== undefined ? ev.detail : ev;
           if (msg.id !== id) return;
-          this._hass.connection.removeEventListener("message", handler);
+          conn.removeEventListener("message", handler);
+          clearTimeout(timer);
           if (msg.type === "result" && msg.success) resolve(msg.result);
-          else reject(msg.error || { message: msg.error?.message || "Unknown error" });
+          else reject(msg.error || { message: (msg.error && msg.error.message) || "Unknown error" });
         };
-        this._hass.connection.addEventListener("message", handler);
-        this._hass.connection.sendMessagePromise({ type, id, ...extra }).catch(reject);
+        conn.addEventListener("message", handler);
+        const timer = setTimeout(() => {
+          conn.removeEventListener("message", handler);
+          reject(new Error("WebSocket timeout"));
+        }, 15000);
+        if (typeof conn.sendMessagePromise === "function") {
+          conn.sendMessagePromise(payload).catch(reject);
+        } else if (typeof conn.sendMessage === "function") {
+          conn.sendMessage(payload);
+        } else {
+          clearTimeout(timer);
+          conn.removeEventListener("message", handler);
+          reject(new Error("No WebSocket send method"));
+        }
       });
     }
 
