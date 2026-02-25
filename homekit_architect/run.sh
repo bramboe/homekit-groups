@@ -14,6 +14,11 @@ fi
 TARGET="${CONFIG}/custom_components/homekit_architect"
 SOURCE="/data/integration/homekit_architect"
 
+if [ ! -d "${SOURCE}" ]; then
+  echo "[HomeKit Entity Architect] ERROR: Integration not found at ${SOURCE}. Rebuild the add-on image." >&2
+  exit 1
+fi
+
 mkdir -p "${CONFIG}/custom_components"
 rm -rf "${TARGET}"
 cp -r "${SOURCE}" "${TARGET}"
