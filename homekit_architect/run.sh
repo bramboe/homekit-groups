@@ -12,7 +12,8 @@ else
 fi
 
 TARGET="${CONFIG}/custom_components/homekit_architect"
-SOURCE="/data/integration/homekit_architect"
+# Use /opt so we are not hidden by Supervisor's /data volume mount
+SOURCE="/opt/homekit_architect/integration"
 
 if [ ! -d "${SOURCE}" ]; then
   echo "[HomeKit Entity Architect] ERROR: Integration not found at ${SOURCE}. Rebuild the add-on image." >&2
