@@ -1,0 +1,14 @@
+---
+description: Always bump version when changing integration or add-on code/config
+alwaysApply: true
+---
+
+# Versioning
+
+When you change the integration or the add-on (code, config, Dockerfile, run.sh, docs, etc.), **always update the version** in all three places:
+
+1. **custom_components/homekit_architect/manifest.json** — `"version": "x.y.z"`
+2. **homekit_architect/config.yaml** — `version: "x.y.z"`
+3. **homekit_architect/integration/homekit_architect/manifest.json** — `"version": "x.y.z"`
+
+Keep all three in sync. Use semantic versioning: patch (1.1.z) for fixes, minor (1.y.0) for new features, major (x.0.0) for breaking changes.
