@@ -55,6 +55,15 @@ The panel talks to the integration via the WebSocket API (`homekit_architect/lis
 - **Position sensor slot** (required): Door contact or cover state for open/closed/opening/closing.
 - **Battery slot** (optional): Battery sensor.
 
+## Development roadmap (all phases integrated)
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| **1. Bridge Inspector** | UI to list active HomeKit bridges and their include/exclude filter | Done |
+| **2. Multi-Select UI** | Entity list with search bar, domain toggles, and multi-select | Done |
+| **3. Packaging Logic** | Backend creates virtual entities from selected entities + type + slot mapping | Done |
+| **4. Auto-Exclusion** | “Ghost” method: update bridge exclude/include and reload | Done |
+
 ## Technical notes
 
 - The integration uses the same entity filter mechanism as the core HomeKit integration: it adds slot entity IDs to the bridge’s **exclude** list and the virtual Architect entity to the **include** list, then reloads the bridge.
