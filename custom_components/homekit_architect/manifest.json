@@ -3,7 +3,7 @@
   "name": "HomeKit Entity Architect",
   "codeowners": [],
   "config_flow": true,
-  "dependencies": ["homekit"],
+  "dependencies": ["homekit", "frontend", "http"],
   "documentation": "https://github.com/Homekit-Groups/Homekit-Groups",
   "integration_type": "helper",
   "iot_class": "local_polling",
