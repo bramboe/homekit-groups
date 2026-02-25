@@ -11,6 +11,10 @@ This add-on **installs** the HomeKit Entity Architect integration into your Home
 5. **Restart Home Assistant** (Settings → System → Restart).
 6. Go to **Settings** → **Devices & services** → **Add integration** → search for **HomeKit Entity Architect** and complete the setup.
 
+## Configuration screen
+
+The add-on’s **Configuration** tab has no options (by design). To configure devices and package entities into accessories, use the **Open Web UI** button on the add-on’s **Info** tab. That opens the integration’s configuration panel (same as **Settings** → **Sidebar** → **HomeKit Architect**).
+
 ## What it does
 
 When you **Start** the add-on, it writes the integration into your config folder. After you restart Home Assistant, you can add the integration and create virtual accessories (e.g. Smart Lock, Garage Door) from slot entities and optionally hide the raw entities on your HomeKit Bridge (ghosting).
