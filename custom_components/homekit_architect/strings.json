@@ -1,0 +1,41 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Choose accessory type",
+        "description": "Select the functional accessory template to create.",
+        "data": {
+          "template_id": "Accessory type"
+        }
+      },
+      "slots": {
+        "title": "Assign entities to slots",
+        "description": "Map your existing entities to the required and optional slots. The virtual accessory will combine them into a single HomeKit tile.",
+        "data": {}
+      },
+      "bridge": {
+        "title": "Select HomeKit Bridge",
+        "description": "Choose which HomeKit Bridge will expose this virtual accessory.",
+        "data": {
+          "homekit_bridge_entry_id": "Bridge"
+        }
+      },
+      "ghosting": {
+        "title": "Automated ghosting",
+        "description": "When enabled, the integration will hide the raw slot entities from this bridge and show only the new virtual accessory.",
+        "data": {
+          "automated_ghosting": "Hide source entities on bridge (ghosting)",
+          "friendly_name": "Friendly name for the accessory"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This entry is already configured.",
+      "invalid_template": "Invalid template selected.",
+      "no_bridge": "No HomeKit Bridge found. Add a HomeKit bridge first (Settings → Devices & Services → HomeKit)."
+    },
+    "error": {
+      "required": "This slot is required."
+    }
+  }
+}
