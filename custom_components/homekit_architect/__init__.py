@@ -34,6 +34,8 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
         await hass.http.async_register_static_paths(
             [StaticPathConfig(f"/{DOMAIN}_panel", frontend_path, False)]
         )
+        panel_url = f"/{DOMAIN}_panel/homekit-architect.js"
+        _LOGGER.info("HomeKit Architect: registering panel; script at %s", panel_url)
         await frontend.async_register_built_in_panel(
             hass,
             component_name="custom",
@@ -43,8 +45,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             config={
                 "_panel_custom": {
                     "name": "homekit-architect-panel",
-                    "module_url": f"/{DOMAIN}_panel/homekit-architect.js",
-                    "js_url": f"/{DOMAIN}_panel/homekit-architect.js",
+                    "js_url": panel_url,
                 },
             },
             require_admin=True,
