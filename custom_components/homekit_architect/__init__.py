@@ -44,6 +44,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
                 "_panel_custom": {
                     "name": "homekit-architect-panel",
                     "module_url": f"/{DOMAIN}_panel/homekit-architect.js",
+                    "js_url": f"/{DOMAIN}_panel/homekit-architect.js",
                 },
             },
             require_admin=True,
