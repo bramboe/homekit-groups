@@ -22,9 +22,10 @@ class RedirectHandler(http.server.BaseHTTPRequestHandler):
         # Prefer 302 redirect; some ingress/iframe setups ignore it, so send HTML that redirects top frame
         accept = self.headers.get("Accept", "")
         if "text/html" in accept:
+            quoted_url = urllib.parse.quote(url, safe=":/")
             body = (
                 f"<!DOCTYPE html><html><head><meta charset='utf-8'>"
-                f"<meta http-equiv='refresh' content='0;url={urllib.parse.quote(url, safe=":/")}'>"
+                f"<meta http-equiv='refresh' content='0;url={quoted_url}'>"
                 f"<script>window.top.location.href={repr(url)};</script></head>"
                 f"<body><p>Redirecting to <a href={repr(url)}>HomeKit Architect</a>...</p></body></html>"
             ).encode("utf-8")
