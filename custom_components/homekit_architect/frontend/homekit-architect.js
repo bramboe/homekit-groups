@@ -25,10 +25,12 @@
     },
   };
 
+  const ROOT_CLASS = "homekit-architect-root";
+
   class HomeKitArchitectPanel extends HTMLElement {
     constructor() {
       super();
-      this.attachShadow({ mode: "open" });
+      this._root = null;
       this._hass = null;
       this._bridges = [];
       this._selectedBridgeId = null;
@@ -59,10 +61,8 @@
     }
 
     connectedCallback() {
-      const root = this.shadowRoot;
-      if (root) {
-        root.innerHTML = "<style>:host{display:block;padding:16px;font-family:var(--mdc-typography-font-family,Roboto,sans-serif);}</style><h1>HomeKit Accessory Architect</h1><p>Loading…</p>";
-      }
+      this.innerHTML = "<div class=\"" + ROOT_CLASS + "\" style=\"display:block;padding:16px;font-family:var(--mdc-typography-font-family,Roboto,sans-serif);\"><h1>HomeKit Accessory Architect</h1><p>Loading…</p></div>";
+      this._root = this.querySelector("." + ROOT_CLASS);
       this._renderSafe();
     }
 
@@ -256,10 +256,8 @@
       try {
         this._render();
       } catch (err) {
-        const root = this.shadowRoot;
-        if (root) {
-          root.innerHTML = `
-            <style>:host{display:block;padding:16px;font-family:sans-serif;}</style>
+        if (this._root) {
+          this._root.innerHTML = `
             <h1>HomeKit Accessory Architect</h1>
             <div class="error" style="padding:12px;background:rgba(244,67,54,0.1);color:#f44336;border-radius:4px;margin-top:12px;">
               Panel error: ${String(err && err.message || err)}
@@ -270,7 +268,7 @@
     }
 
     _render() {
-      const root = this.shadowRoot;
+      const root = this._root;
       if (!root) return;
 
       const bridge = this._bridges.find((b) => b.entry_id === this._selectedBridgeId);
@@ -285,35 +283,35 @@
 
       root.innerHTML = `
         <style>
-          :host { display: block; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
-          h1 { font-size: 24px; margin: 0 0 16px 0; }
-          .card { background: var(--ha-card-background, var(--card-background-color, #1c1c1c)); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-          select, input[type="text"] { width: 100%; max-width: 400px; padding: 8px 12px; font-size: 14px; border-radius: 4px; margin-bottom: 8px; box-sizing: border-box; }
-          .loading, .error, .success { padding: 12px; margin: 8px 0; border-radius: 4px; }
-          .loading { background: rgba(255,152,0,0.1); color: var(--primary-color, #ff9800); }
-          .error { background: rgba(244,67,54,0.1); color: var(--error-color, #f44336); }
-          .success { background: rgba(76,175,80,0.1); color: var(--success-color, #4caf50); }
-          .filter-info { font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
-          .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
-          .toolbar input[type="text"] { max-width: 240px; margin: 0; }
-          .domain-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-          .domain-chip { padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; background: var(--secondary-background-color, #2c2c2c); }
-          .domain-chip.active { background: var(--primary-color, #03a9f4); color: #fff; }
-          ul { list-style: none; padding: 0; margin: 0; max-height: 360px; overflow-y: auto; }
-          li { padding: 8px 12px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.12)); display: flex; align-items: center; gap: 10px; }
-          li label { flex: 1; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-          li .domain { font-size: 11px; opacity: 0.8; margin-right: 8px; }
-          li .state { font-size: 12px; opacity: 0.9; }
-          .btn { padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; border: none; background: var(--primary-color, #03a9f4); color: #fff; }
-          .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-          .btn.secondary { background: var(--secondary-background-color, #2c2c2c); }
-          .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-          .modal { background: var(--ha-card-background, #1c1c1c); border-radius: 12px; padding: 24px; max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto; }
-          .modal h2 { margin: 0 0 16px 0; font-size: 20px; }
-          .modal .field { margin-bottom: 14px; }
-          .modal .field label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--secondary-text-color); }
-          .modal .actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
-          .modal select.slot { width: 100%; max-width: none; margin-top: 4px; }
+          .${ROOT_CLASS} { display: block; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
+          .${ROOT_CLASS} h1 { font-size: 24px; margin: 0 0 16px 0; }
+          .${ROOT_CLASS} .card { background: var(--ha-card-background, var(--card-background-color, #1c1c1c)); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+          .${ROOT_CLASS} select, .${ROOT_CLASS} input[type="text"] { width: 100%; max-width: 400px; padding: 8px 12px; font-size: 14px; border-radius: 4px; margin-bottom: 8px; box-sizing: border-box; }
+          .${ROOT_CLASS} .loading, .${ROOT_CLASS} .error, .${ROOT_CLASS} .success { padding: 12px; margin: 8px 0; border-radius: 4px; }
+          .${ROOT_CLASS} .loading { background: rgba(255,152,0,0.1); color: var(--primary-color, #ff9800); }
+          .${ROOT_CLASS} .error { background: rgba(244,67,54,0.1); color: var(--error-color, #f44336); }
+          .${ROOT_CLASS} .success { background: rgba(76,175,80,0.1); color: var(--success-color, #4caf50); }
+          .${ROOT_CLASS} .filter-info { font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
+          .${ROOT_CLASS} .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+          .${ROOT_CLASS} .toolbar input[type="text"] { max-width: 240px; margin: 0; }
+          .${ROOT_CLASS} .domain-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+          .${ROOT_CLASS} .domain-chip { padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; background: var(--secondary-background-color, #2c2c2c); }
+          .${ROOT_CLASS} .domain-chip.active { background: var(--primary-color, #03a9f4); color: #fff; }
+          .${ROOT_CLASS} ul { list-style: none; padding: 0; margin: 0; max-height: 360px; overflow-y: auto; }
+          .${ROOT_CLASS} li { padding: 8px 12px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.12)); display: flex; align-items: center; gap: 10px; }
+          .${ROOT_CLASS} li label { flex: 1; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+          .${ROOT_CLASS} li .domain { font-size: 11px; opacity: 0.8; margin-right: 8px; }
+          .${ROOT_CLASS} li .state { font-size: 12px; opacity: 0.9; }
+          .${ROOT_CLASS} .btn { padding: 8px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; border: none; background: var(--primary-color, #03a9f4); color: #fff; }
+          .${ROOT_CLASS} .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+          .${ROOT_CLASS} .btn.secondary { background: var(--secondary-background-color, #2c2c2c); }
+          .${ROOT_CLASS} .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+          .${ROOT_CLASS} .modal { background: var(--ha-card-background, #1c1c1c); border-radius: 12px; padding: 24px; max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto; }
+          .${ROOT_CLASS} .modal h2 { margin: 0 0 16px 0; font-size: 20px; }
+          .${ROOT_CLASS} .modal .field { margin-bottom: 14px; }
+          .${ROOT_CLASS} .modal .field label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--secondary-text-color); }
+          .${ROOT_CLASS} .modal .actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+          .${ROOT_CLASS} .modal select.slot { width: 100%; max-width: none; margin-top: 4px; }
         </style>
 
         <h1>HomeKit Accessory Architect</h1>
@@ -401,16 +399,16 @@
         ` : ""}
       `;
 
-      const sel = root.getElementById("bridge-select");
+      const sel = root.querySelector("#bridge-select");
       if (sel) sel.addEventListener("change", (e) => this._onBridgeChange(e));
-      const searchInput = root.getElementById("search-input");
+      const searchInput = root.querySelector("#search-input");
       if (searchInput) searchInput.addEventListener("input", (e) => this._onSearchInput(e));
-      const selectAll = root.getElementById("select-all");
+      const selectAll = root.querySelector("#select-all");
       if (selectAll) {
         selectAll.checked = filtered.length > 0 && filtered.every((e) => this._selectedIds.has(e.entity_id));
         selectAll.addEventListener("change", (e) => this._onSelectAll(e.target?.checked));
       }
-      const btnPackage = root.getElementById("btn-package");
+      const btnPackage = root.querySelector("#btn-package");
       if (btnPackage) btnPackage.addEventListener("click", () => this._openPackageModal());
       root.querySelectorAll(".domain-chip").forEach((el) => {
         el.addEventListener("click", () => this._onDomainToggle(el.getAttribute("data-domain")));
@@ -421,17 +419,17 @@
       });
 
       if (this._modalOpen) {
-        const displayNameEl = root.getElementById("modal-display-name");
+        const displayNameEl = root.querySelector("#modal-display-name");
         if (displayNameEl) {
           displayNameEl.value = this._packageDisplayName;
           displayNameEl.addEventListener("input", (e) => { this._packageDisplayName = e.target?.value || ""; });
         }
-        const typeEl = root.getElementById("modal-type");
+        const typeEl = root.querySelector("#modal-type");
         if (typeEl) {
           typeEl.value = this._packageType;
           typeEl.addEventListener("change", (e) => this._onPackageTypeChange(e));
         }
-        const hideEl = root.getElementById("modal-hide-sources");
+        const hideEl = root.querySelector("#modal-hide-sources");
         if (hideEl) {
           hideEl.checked = this._packageHideSources;
           hideEl.addEventListener("change", (e) => { this._packageHideSources = e.target?.checked; });
@@ -445,9 +443,9 @@
             });
           }
         });
-        root.getElementById("modal-backdrop")?.addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") this._closeModal(); });
-        root.getElementById("modal-cancel")?.addEventListener("click", () => this._closeModal());
-        root.getElementById("modal-submit")?.addEventListener("click", () => this._submitPackage());
+        root.querySelector("#modal-backdrop")?.addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") this._closeModal(); });
+        root.querySelector("#modal-cancel")?.addEventListener("click", () => this._closeModal());
+        root.querySelector("#modal-submit")?.addEventListener("click", () => this._submitPackage());
       }
     }
 
