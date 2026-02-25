@@ -53,13 +53,17 @@
         this._fetchBridges().catch((e) => {
           this._error = e?.message || String(e);
           this._loading = false;
-          this._render();
+          this._renderSafe();
         });
       }
     }
 
     connectedCallback() {
-      this._render();
+      const root = this.shadowRoot;
+      if (root) {
+        root.innerHTML = "<style>:host{display:block;padding:16px;font-family:var(--mdc-typography-font-family,Roboto,sans-serif);}</style><h1>HomeKit Accessory Architect</h1><p>Loading…</p>";
+      }
+      this._renderSafe();
     }
 
     async _wsSend(type, extra = {}) {
@@ -96,7 +100,7 @@
     async _fetchBridges() {
       this._loading = true;
       this._error = null;
-      this._render();
+      this._renderSafe();
       try {
         const res = await this._wsSend(`${DOMAIN}/list_bridges`);
         this._bridges = res?.bridges || [];
@@ -104,7 +108,7 @@
         this._error = e?.message || String(e);
       }
       this._loading = false;
-      this._render();
+      this._renderSafe();
     }
 
     async _onBridgeChange(e) {
@@ -113,10 +117,10 @@
       this._entities = [];
       this._selectedIds.clear();
       this._error = null;
-      this._render();
+      this._renderSafe();
       if (!id) return;
       this._loading = true;
-      this._render();
+      this._renderSafe();
       try {
         const res = await this._wsSend(`${DOMAIN}/bridge_entities`, { bridge_entry_id: id });
         this._entities = res?.entities || [];
@@ -124,7 +128,7 @@
         this._error = err?.message || String(err);
       }
       this._loading = false;
-      this._render();
+      this._renderSafe();
     }
 
     _filteredEntities() {
@@ -151,26 +155,26 @@
 
     _onSearchInput(e) {
       this._search = e.target?.value || "";
-      this._render();
+      this._renderSafe();
     }
 
     _onDomainToggle(domain) {
       if (this._domainFilter.has(domain)) this._domainFilter.delete(domain);
       else this._domainFilter.add(domain);
-      this._render();
+      this._renderSafe();
     }
 
     _onEntityCheck(e, entityId) {
       if (e.target?.checked) this._selectedIds.add(entityId);
       else this._selectedIds.delete(entityId);
-      this._render();
+      this._renderSafe();
     }
 
     _onSelectAll(checked) {
       const list = this._filteredEntities();
       if (checked) list.forEach((e) => e.entity_id && this._selectedIds.add(e.entity_id));
       else list.forEach((e) => e.entity_id && this._selectedIds.delete(e.entity_id));
-      this._render();
+      this._renderSafe();
     }
 
     _openPackageModal() {
@@ -182,12 +186,12 @@
       this._packageSubmitting = false;
       this._error = null;
       this._success = null;
-      this._render();
+      this._renderSafe();
     }
 
     _closeModal() {
       this._modalOpen = false;
-      this._render();
+      this._renderSafe();
     }
 
     _suggestSlotMapping(accessoryType) {
@@ -218,7 +222,7 @@
     _onPackageTypeChange(e) {
       this._packageType = e.target?.value || "lock";
       this._packageSlotMapping = this._suggestSlotMapping(this._packageType);
-      this._render();
+      this._renderSafe();
     }
 
     async _submitPackage() {
@@ -228,7 +232,7 @@
       this._packageSubmitting = true;
       this._error = null;
       this._success = null;
-      this._render();
+      this._renderSafe();
       try {
         const res = await this._wsSend(`${DOMAIN}/package_accessory`, {
           bridge_entry_id: this._selectedBridgeId,
@@ -245,7 +249,24 @@
         this._error = err?.message || String(err);
       }
       this._packageSubmitting = false;
-      this._render();
+      this._renderSafe();
+    }
+
+    _renderSafe() {
+      try {
+        this._render();
+      } catch (err) {
+        const root = this.shadowRoot;
+        if (root) {
+          root.innerHTML = `
+            <style>:host{display:block;padding:16px;font-family:sans-serif;}</style>
+            <h1>HomeKit Accessory Architect</h1>
+            <div class="error" style="padding:12px;background:rgba(244,67,54,0.1);color:#f44336;border-radius:4px;margin-top:12px;">
+              Panel error: ${String(err && err.message || err)}
+            </div>
+          `;
+        }
+      }
     }
 
     _render() {
