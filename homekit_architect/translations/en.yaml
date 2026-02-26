@@ -1,0 +1,4 @@
+configuration:
+  ha_token:
+    name: "Home Assistant token"
+    description: "Long-lived access token (only needed if Supervisor token is unavailable). Create one in your Profile → Long-lived access tokens."
