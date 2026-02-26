@@ -32,7 +32,8 @@ On the **settings** page (add-on URL + `/settings`):
 
 ## Updating
 
-Update the add-on from the Add-on store, then **Start** it again to overwrite the integration files. Restart Home Assistant once to load the new version (same reason as above: HA loads custom integrations at startup).
+1. **Get the new version in Home Assistant** – The Supervisor fetches add-on versions from the GitHub repo. After you push a new release (e.g. bump `version` in `homekit_architect/config.yaml` and push to `main`), go to **Settings** → **Add-ons** (or **Apps**) → **Add-on store** → **⋮** (top right) → **Reload**. Then open **HomeKit Entity Architect** and click **Update** if it appears.
+2. **Apply the update** – After updating the add-on, click **Start** (or restart the add-on) so it overwrites the integration files. Restart Home Assistant once to load the new integration code.
 
 ## Panel shows blank
 
