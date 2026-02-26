@@ -1,7 +1,7 @@
 ---
 name: HomeKit Entity Architect
-description: Installs the HomeKit Entity Architect integration into Home Assistant. Add virtual accessories (e.g. Smart Lock, Garage Door) from slot entities and optionally hide the raw entities on your HomeKit Bridge.
-version: "2.0.0"
+description: Group raw entities into single HomeKit accessories (Smart Lock, Garage Door) and optionally ghost the source entities from your bridge.
+version: "2.0.1"
 slug: homekit_architect
 url: https://github.com/bramboe/homekit-groups
 arch:
@@ -12,6 +12,7 @@ arch:
   - i386
 init: false
 startup: application
+hassio_api: true
 homeassistant_api: true
 ingress: true
 ingress_port: 8099
@@ -19,7 +20,5 @@ panel_title: HomeKit Architect
 panel_icon: mdi:lock
 map:
   - homeassistant_config:rw
-schema:
-  reinstall_on_start: bool?
-options:
-  reinstall_on_start: true
+options: {}
+schema: {}
