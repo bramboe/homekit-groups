@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Minimal HTTP server for the add-on configuration page (ingress).
-Serves a UI to reinstall the integration and open the integration panel.
-Listens on port 8099 for Home Assistant ingress.
+App web UI for HomeKit Entity Architect (ingress).
+Follows https://developers.home-assistant.io/docs/apps/tutorial/ and
+https://developers.home-assistant.io/docs/apps/presentation/#ingress:
+serve the app interface on port 8099; no redirect — real content so the screen is never blank.
 """
 import json
 import os
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 LISTEN_PORT = 8099
 SOURCE = "/usr/share/homekit_architect/homekit_architect"
@@ -53,60 +54,59 @@ def get_status():
     }
 
 
+# Single UI page served at / (per app tutorial: serve content, no redirect)
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HomeKit Entity Architect – Add-on</title>
+  <title>HomeKit Entity Architect</title>
   <style>
-    :root { --ha-card-background: #1c1c1c; --primary: #03a9f4; --error: #f44336; --success: #4caf50; }
+    :root { --card: #1c1c1c; --primary: #03a9f4; --error: #f44336; --success: #4caf50; }
     * { box-sizing: border-box; }
-    body { font-family: Roboto, sans-serif; margin: 0; padding: 24px; background: #111; color: #e0e0e0; max-width: 640px; margin-left: auto; margin-right: auto; }
-    h1 { font-size: 22px; margin: 0 0 8px 0; }
-    .card { background: var(--ha-card-background); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
-    p { margin: 0 0 12px 0; color: #b0b0b0; font-size: 14px; }
-    .muted { font-size: 13px; color: #888; margin-bottom: 16px; }
-    .status { font-size: 13px; padding: 12px; border-radius: 6px; margin: 12px 0; background: rgba(0,0,0,0.2); }
+    body { font-family: Roboto, sans-serif; margin: 0; padding: 24px; background: #111; color: #e0e0e0; max-width: 560px; margin-left: auto; margin-right: auto; }
+    h1 { font-size: 24px; margin: 0 0 8px 0; }
+    .card { background: var(--card); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    p { margin: 0 0 16px 0; color: #b0b0b0; font-size: 14px; line-height: 1.4; }
+    .status { font-size: 13px; padding: 12px; border-radius: 6px; margin: 16px 0; background: rgba(0,0,0,0.25); }
     .status.ok { border-left: 4px solid var(--success); }
     .status.warn { border-left: 4px solid #ff9800; }
     .status.err { border-left: 4px solid var(--error); }
-    .btn { display: inline-block; padding: 10px 20px; border-radius: 6px; border: none; font-size: 14px; cursor: pointer; text-decoration: none; margin-right: 8px; margin-top: 8px; }
+    .btn { display: inline-block; padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; text-decoration: none; margin-right: 10px; margin-bottom: 10px; border: none; }
     .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:hover { opacity: 0.92; }
     .btn-secondary { background: #333; color: #e0e0e0; }
     .msg { margin-top: 12px; padding: 10px; border-radius: 6px; }
     .msg.success { background: rgba(76,175,80,0.2); color: var(--success); }
     .msg.error { background: rgba(244,67,54,0.2); color: var(--error); }
     code { font-size: 12px; background: #333; padding: 2px 6px; border-radius: 4px; }
-    a { color: var(--primary); }
+    .hr { border: none; border-top: 1px solid #333; margin: 20px 0; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Add-on settings</h1>
-    <p>Reinstall the integration or restart Home Assistant. For day-to-day use, use the main panel to manage bridges and package accessories.</p>
-    <a href="/config/homekit-architect" class="btn btn-primary">Open HomeKit Architect →</a>
-    <hr style="border:none; border-top:1px solid #333; margin: 16px 0;">
-    <div id="status" class="status"></div>
+    <h1>HomeKit Entity Architect</h1>
+    <p>Manage HomeKit bridges and package entities into single accessories. Open the full panel in Home Assistant to choose a bridge, select entities, and create virtual locks or garage doors.</p>
+    <a href="/config/homekit-architect" class="btn btn-primary" target="_top">Open HomeKit Architect panel</a>
+    <div class="hr"></div>
+    <div id="status" class="status">Loading…</div>
     <div id="message"></div>
     <button id="reinstall" class="btn btn-secondary">Reinstall integration</button>
-    <a href="/config/server_control" class="btn btn-secondary">Restart Home Assistant</a>
+    <a href="/config/server_control" class="btn btn-secondary" target="_top">Restart Home Assistant</a>
   </div>
   <script>
-    const statusEl = document.getElementById('status');
-    const messageEl = document.getElementById('message');
-    const reinstallBtn = document.getElementById('reinstall');
-    // Ingress serves at e.g. /api/hassio_ingress/XXX/ – base must be that root (this page is at .../settings)
-    let pathname = document.location.pathname;
-    const base = pathname.replace(/\/settings\/?$/, '').replace(/\/?$/, '/');
+    var statusEl = document.getElementById('status');
+    var messageEl = document.getElementById('message');
+    var reinstallBtn = document.getElementById('reinstall');
+    var pathname = document.location.pathname;
+    var base = pathname.replace(/\/?$/, '/');
 
     function setMessage(text, type) {
       messageEl.innerHTML = text ? '<div class="msg ' + type + '">' + text + '</div>' : '';
     }
 
     function loadStatus() {
-      fetch(base + 'status').then(r => r.json()).then(d => {
+      fetch(base + 'status').then(function(r) { return r.json(); }).then(function(d) {
         if (d.installed) {
           statusEl.className = 'status ok';
           statusEl.innerHTML = 'Integration installed at <code>' + d.target + '</code>';
@@ -117,7 +117,7 @@ HTML_PAGE = """<!DOCTYPE html>
           statusEl.className = 'status err';
           statusEl.innerHTML = 'Source not found. Rebuild the add-on.';
         }
-      }).catch(() => {
+      }).catch(function() {
         statusEl.className = 'status err';
         statusEl.textContent = 'Could not load status.';
       });
@@ -126,18 +126,16 @@ HTML_PAGE = """<!DOCTYPE html>
     reinstallBtn.addEventListener('click', function() {
       reinstallBtn.disabled = true;
       setMessage('', '');
-      fetch(base + 'reinstall', { method: 'POST' })
-        .then(r => r.json())
-        .then(d => {
-          if (d.ok) {
-            setMessage(d.message || 'Integration reinstalled. Use "Restart Home Assistant" below to load changes.', 'success');
-            loadStatus();
-          } else {
-            setMessage(d.error || 'Reinstall failed.', 'error');
-          }
-        })
-        .catch(() => setMessage('Request failed.', 'error'))
-        .finally(() => { reinstallBtn.disabled = false; });
+      fetch(base + 'reinstall', { method: 'POST' }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+          setMessage(d.message || 'Integration reinstalled. Restart Home Assistant to load changes.', 'success');
+          loadStatus();
+        } else {
+          setMessage(d.error || 'Reinstall failed.', 'error');
+        }
+      }).catch(function() { setMessage('Request failed.', 'error'); }).finally(function() {
+        reinstallBtn.disabled = false;
+      });
     });
 
     loadStatus();
@@ -154,37 +152,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/") or "/"
         if path == "/" or path == "":
-            # Serve a full-viewport iframe that embeds the integration panel (no redirect = no blank/duplicate sidebar)
-            # Same origin, so the panel loads inside this content area and works reliably (see matterbridge-style UI)
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(
-                b"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HomeKit Architect</title>
-  <style>
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; height: 100%; background: #111; }
-    .frame-wrap { position: fixed; inset: 0; display: flex; flex-direction: column; }
-    .frame-wrap iframe { flex: 1; width: 100%; border: none; display: block; }
-    .bar { flex-shrink: 0; padding: 8px 16px; background: #1c1c1c; color: #b0b0b0; font-size: 13px; font-family: Roboto, sans-serif; }
-    .bar a { color: #03a9f4; }
-  </style>
-</head>
-<body>
-  <div class="frame-wrap">
-    <div class="bar">HomeKit Architect &middot; <a href="/config/homekit-architect" target="_blank">Open in new tab</a> &middot; <a href="settings">Add-on settings (reinstall / restart)</a></div>
-    <iframe src="/config/homekit-architect" title="HomeKit Architect panel"></iframe>
-  </div>
-</body>
-</html>"""
-            )
-            return
-        if path == "/settings" or path == "/settings/":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
