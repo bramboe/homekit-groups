@@ -15,15 +15,33 @@ from urllib.parse import urlparse
 
 LISTEN_PORT = 8099
 HA_API = "http://supervisor/core/api"
+HA_DIRECT = None  # set if using a long-lived token (direct to HA, not via supervisor)
+
+
+def _read_options():
+    try:
+        with open("/data/options.json") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 
 def _token():
-    return os.environ.get("SUPERVISOR_TOKEN", "")
+    # 1. Supervisor token (set when homeassistant_api:true was present at install)
+    t = os.environ.get("SUPERVISOR_TOKEN", "")
+    if t:
+        return t, HA_API
+    # 2. Long-lived access token from add-on options (fallback)
+    opts = _read_options()
+    t = (opts.get("ha_token") or "").strip()
+    if t:
+        return t, "http://supervisor/core/api"
+    return "", HA_API
 
 
 def ha(method, path, data=None):
-    token = _token()
-    url = f"{HA_API}{path}"
+    token, base = _token()
+    url = f"{base}{path}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
@@ -406,8 +424,9 @@ class H(BaseHTTPRequestHandler):
 
 
 def main():
-    token = _token()
-    sys.stderr.write(f"[HomeKit Architect] Token present: {bool(token)} (len={len(token)})\n")
+    token, base = _token()
+    source = "SUPERVISOR_TOKEN" if os.environ.get("SUPERVISOR_TOKEN") else ("ha_token option" if token else "none")
+    sys.stderr.write(f"[HomeKit Architect] Auth: {source} (token len={len(token)})\n")
     HTTPServer(("0.0.0.0", LISTEN_PORT), H).serve_forever()
 
 
