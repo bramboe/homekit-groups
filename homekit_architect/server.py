@@ -154,14 +154,34 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/") or "/"
         if path == "/" or path == "":
-            # Navigate the top window to the panel (avoids iframe embedding = duplicate sidebar + blank)
+            # Serve a full-viewport iframe that embeds the integration panel (no redirect = no blank/duplicate sidebar)
+            # Same origin, so the panel loads inside this content area and works reliably (see matterbridge-style UI)
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(
-                b"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>HomeKit Architect</title>"""
-                b"""<script>window.top.location.href="/config/homekit-architect";</script>"""
-                b"""</head><body><p>Opening HomeKit Architect&hellip; <a href="/config/homekit-architect">Click here</a> if not redirected.</p></body></html>"""
+                b"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HomeKit Architect</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #111; }
+    .frame-wrap { position: fixed; inset: 0; display: flex; flex-direction: column; }
+    .frame-wrap iframe { flex: 1; width: 100%; border: none; display: block; }
+    .bar { flex-shrink: 0; padding: 8px 16px; background: #1c1c1c; color: #b0b0b0; font-size: 13px; font-family: Roboto, sans-serif; }
+    .bar a { color: #03a9f4; }
+  </style>
+</head>
+<body>
+  <div class="frame-wrap">
+    <div class="bar">HomeKit Architect &middot; <a href="/config/homekit-architect" target="_blank">Open in new tab</a> &middot; <a href="settings">Add-on settings (reinstall / restart)</a></div>
+    <iframe src="/config/homekit-architect" title="HomeKit Architect panel"></iframe>
+  </div>
+</body>
+</html>"""
             )
             return
         if path == "/settings" or path == "/settings/":
