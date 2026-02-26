@@ -84,21 +84,22 @@ HTML_PAGE = """<!DOCTYPE html>
 </head>
 <body>
   <div class="card">
-    <h1>HomeKit Entity Architect</h1>
-    <p>Add-on configuration. Reinstall the integration here or open the main configuration panel.</p>
-    <p class="muted">Home Assistant loads custom integrations only at startup, so after the first install (or after an update) you need to restart HA once so it picks up the files. This is how all custom integrations work. Then the add-on and integration work without further restarts.</p>
+    <h1>Add-on settings</h1>
+    <p>Reinstall the integration or restart Home Assistant. For day-to-day use, use the main panel to manage bridges and package accessories.</p>
+    <a href="/config/homekit-architect" class="btn btn-primary">Open HomeKit Architect →</a>
+    <hr style="border:none; border-top:1px solid #333; margin: 16px 0;">
     <div id="status" class="status"></div>
     <div id="message"></div>
-    <button id="reinstall" class="btn btn-primary">Reinstall integration</button>
-    <a href="/config/homekit-architect" class="btn btn-secondary">Open configuration panel</a>
+    <button id="reinstall" class="btn btn-secondary">Reinstall integration</button>
     <a href="/config/server_control" class="btn btn-secondary">Restart Home Assistant</a>
   </div>
   <script>
     const statusEl = document.getElementById('status');
     const messageEl = document.getElementById('message');
     const reinstallBtn = document.getElementById('reinstall');
-    // Ingress serves at e.g. /api/hassio_ingress/XXX/ – use relative URLs so fetch hits the add-on
-    const base = document.location.pathname.replace(/\/?$/, '/');
+    // Ingress serves at e.g. /api/hassio_ingress/XXX/ – base must be that root (this page is at .../settings)
+    let pathname = document.location.pathname;
+    const base = pathname.replace(/\/settings\/?$/, '').replace(/\/?$/, '/');
 
     function setMessage(text, type) {
       messageEl.innerHTML = text ? '<div class="msg ' + type + '">' + text + '</div>' : '';
@@ -153,6 +154,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/") or "/"
         if path == "/" or path == "":
+            # Send users straight to the real panel (manage bridges, package accessories)
+            self.send_response(302)
+            self.send_header("Location", "/config/homekit-architect")
+            self.end_headers()
+            return
+        if path == "/settings" or path == "/settings/":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
