@@ -1,181 +1,13 @@
 #!/usr/bin/env python3
 """
-HomeKit Entity Architect – Ingress UI.
-Serves the full configuration screen: bridge selection, entity discovery,
-functional packaging, and automated ghosting.
+HomeKit Entity Architect – Ingress UI server.
+Serves the HTML/JS page.  All HA API calls happen browser-side using the auth
+token the HA frontend already stores in localStorage (same origin).
 """
-import json
-import os
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse
 
 LISTEN_PORT = 8099
-HA_API = "http://supervisor/core/api"
-HA_DIRECT = None  # set if using a long-lived token (direct to HA, not via supervisor)
-
-
-def _read_options():
-    try:
-        with open("/data/options.json") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def _token():
-    # 1. Supervisor token (set when homeassistant_api:true was present at install)
-    t = os.environ.get("SUPERVISOR_TOKEN", "")
-    if t:
-        return t, HA_API
-    # 2. Long-lived access token from add-on options (fallback)
-    opts = _read_options()
-    t = (opts.get("ha_token") or "").strip()
-    if t:
-        return t, "http://supervisor/core/api"
-    return "", HA_API
-
-
-def ha(method, path, data=None):
-    token, base = _token()
-    url = f"{base}{path}"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    body = json.dumps(data).encode() if data else None
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")[:400]
-        sys.stderr.write(f"[ha] {method} {path} → {e.code}: {detail}\n")
-        return {"error": f"{e.code}: {detail}"}
-    except Exception as e:
-        sys.stderr.write(f"[ha] {method} {path} → {e}\n")
-        return {"error": str(e)}
-
-
-# -- API handlers ----------------------------------------------------------
-
-def api_bridges():
-    entries = ha("GET", "/config/config_entries/entry")
-    if isinstance(entries, dict) and "error" in entries:
-        return entries
-    bridges = []
-    for e in entries:
-        if e.get("domain") != "homekit":
-            continue
-        opts = e.get("options") or {}
-        if opts.get("homekit_mode") != "bridge":
-            continue
-        filt = opts.get("filter") or {}
-        bridges.append({
-            "entry_id": e["entry_id"],
-            "title": e.get("title") or e.get("data", {}).get("name", "HomeKit Bridge"),
-            "filter": {
-                "include_entities": filt.get("include_entities") or [],
-                "exclude_entities": filt.get("exclude_entities") or [],
-                "include_domains": filt.get("include_domains") or [],
-                "exclude_domains": filt.get("exclude_domains") or [],
-            },
-        })
-    return {"bridges": bridges}
-
-
-def api_entities(bridge_entry_id):
-    br = api_bridges()
-    if "error" in br:
-        return br
-    bridge = next((b for b in br["bridges"] if b["entry_id"] == bridge_entry_id), None)
-    if not bridge:
-        return {"error": "Bridge not found"}
-    filt = bridge["filter"]
-    inc_ent = set(filt["include_entities"])
-    exc_ent = set(filt["exclude_entities"])
-    inc_dom = set(filt["include_domains"])
-    exc_dom = set(filt["exclude_domains"])
-
-    states = ha("GET", "/states")
-    if isinstance(states, dict) and "error" in states:
-        return states
-
-    out = []
-    for s in states:
-        eid = s.get("entity_id", "")
-        dom = eid.split(".")[0] if "." in eid else ""
-        ok = False
-        if inc_ent and eid in inc_ent:
-            ok = True
-        elif inc_dom and dom in inc_dom:
-            ok = True
-        elif not inc_ent and not inc_dom:
-            ok = True
-        if ok and (eid in exc_ent or dom in exc_dom):
-            ok = False
-        if ok:
-            out.append({
-                "entity_id": eid,
-                "domain": dom,
-                "friendly_name": s.get("attributes", {}).get("friendly_name", eid),
-                "state": s.get("state", ""),
-            })
-    out.sort(key=lambda e: e["entity_id"])
-    return {"entities": out, "filter": filt}
-
-
-def api_package(payload):
-    atype = (payload.get("accessory_type") or "lock").lower()
-    tmpl = {"lock": "security_lock", "cover": "garage_door"}.get(atype)
-    if not tmpl:
-        return {"error": f"Unknown type: {atype}"}
-
-    flow_data = {
-        "template_id": tmpl,
-        "slots": payload.get("slot_mapping") or {},
-        "homekit_bridge_entry_id": payload.get("bridge_entry_id", ""),
-        "automated_ghosting": payload.get("hide_sources", True),
-        "friendly_name": (payload.get("display_name") or "Accessory").strip(),
-    }
-
-    step = ha("POST", "/config/config_entries/flow", {
-        "handler": "homekit_architect",
-        "show_advanced_options": False,
-    })
-    if isinstance(step, dict) and "error" in step:
-        return step
-    flow_id = step.get("flow_id")
-    if not flow_id:
-        return {"error": "Could not start config flow"}
-
-    for _ in range(6):
-        t = step.get("type")
-        if t == "create_entry":
-            return {"ok": True, "title": step.get("title", flow_data["friendly_name"])}
-        if t == "abort":
-            return {"error": step.get("reason", "Aborted")}
-        if t != "form":
-            return {"error": f"Unexpected step type: {t}"}
-        sid = step.get("step_id", "")
-        if sid == "user":
-            step = ha("POST", f"/config/config_entries/flow/{flow_id}", {"template_id": tmpl})
-        elif sid == "slots":
-            step = ha("POST", f"/config/config_entries/flow/{flow_id}", flow_data["slots"])
-        elif sid == "bridge":
-            step = ha("POST", f"/config/config_entries/flow/{flow_id}", {"homekit_bridge_entry_id": flow_data["homekit_bridge_entry_id"]})
-        elif sid == "ghosting":
-            step = ha("POST", f"/config/config_entries/flow/{flow_id}", {"automated_ghosting": flow_data["automated_ghosting"], "friendly_name": flow_data["friendly_name"]})
-        elif sid == "panel":
-            step = ha("POST", f"/config/config_entries/flow/{flow_id}", flow_data)
-        else:
-            return {"error": f"Unknown step: {sid}"}
-        if isinstance(step, dict) and "error" in step:
-            return step
-    return {"error": "Flow did not complete"}
-
-
-# -- HTML ------------------------------------------------------------------
 
 HTML = r"""<!DOCTYPE html>
 <html lang="en">
@@ -258,42 +90,111 @@ select:focus,input:focus{border-color:var(--pri)}
 
 <script>
 (function(){
-var B=document.location.pathname.replace(/\/?$/,'/');
+
+/* ── Auth ───────────────────────────────────────────────────────────
+   The ingress iframe is served from the same origin as HA, so
+   localStorage (where the HA frontend stores its auth token) is
+   directly accessible.  No server-side token needed.
+   ────────────────────────────────────────────────────────────────── */
+var _td;
+function tokenData(){
+  if(!_td){try{_td=JSON.parse(localStorage.getItem('hassTokens'))}catch(e){}}
+  return _td;
+}
+
+function getToken(){
+  return new Promise(function(ok,fail){
+    var d=tokenData();
+    if(!d||!d.access_token){fail(new Error('No HA session found – refresh the page'));return}
+    if(d.token_expires && Date.now()>d.token_expires){
+      fetch('/auth/token',{
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(d.refresh_token)
+            +'&client_id='+encodeURIComponent(d.clientId||'')
+      })
+      .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})
+      .then(function(j){d.access_token=j.access_token;d.token_expires=Date.now()+j.expires_in*1000;localStorage.setItem('hassTokens',JSON.stringify(d));ok(j.access_token)})
+      .catch(fail);
+    }else{ok(d.access_token)}
+  });
+}
+
+function haGet(path){
+  return getToken().then(function(t){
+    return fetch('/api'+path,{headers:{'Authorization':'Bearer '+t}});
+  }).then(function(r){if(!r.ok)throw new Error(r.status+': '+r.statusText);return r.json()});
+}
+function haPost(path,body){
+  return getToken().then(function(t){
+    return fetch('/api'+path,{method:'POST',headers:{'Authorization':'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  }).then(function(r){if(!r.ok)throw new Error(r.status+': '+r.statusText);return r.json()});
+}
+
+/* ── Helpers ──── */
 var bridges=[],bid='',ents=[],sel={},q='',df={};
 var SLOTS={
   security_lock:{action_slot:'Lock actuator',state_slot:'State sensor',battery_slot:'Battery (optional)',obstruction_slot:'Obstruction (optional)'},
   garage_door:{actuator_slot:'Open/Close actuator',position_sensor_slot:'Position sensor',battery_slot:'Battery (optional)'}
 };
 var TM={lock:'security_lock',cover:'garage_door'};
+
 function $(i){return document.getElementById(i)}
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
-function api(m,p,b){var o={method:m,headers:{'Content-Type':'application/json'}};if(b)o.body=JSON.stringify(b);return fetch(B+p,o).then(function(r){return r.json()})}
 
-// Bridge
+/* ── Bridges ──── */
 function loadBridges(){
-  api('GET','api/bridges').then(function(d){
-    if(d.error){$('bsel').innerHTML='<option>'+esc(d.error)+'</option>';return}
-    bridges=d.bridges||[];
+  haGet('/config/config_entries/entry').then(function(entries){
+    bridges=[];
+    entries.forEach(function(e){
+      if(e.domain!=='homekit')return;
+      var opts=e.options||{};
+      if(opts.homekit_mode!=='bridge')return;
+      var f=opts.filter||{};
+      bridges.push({entry_id:e.entry_id,title:e.title||'HomeKit Bridge',filter:{
+        include_entities:f.include_entities||[],exclude_entities:f.exclude_entities||[],
+        include_domains:f.include_domains||[],exclude_domains:f.exclude_domains||[]
+      }});
+    });
     var h='<option value="">Select a bridge…</option>';
     bridges.forEach(function(b){h+='<option value="'+esc(b.entry_id)+'">'+esc(b.title)+'</option>'});
     $('bsel').innerHTML=h;
-  }).catch(function(e){$('bsel').innerHTML='<option>Failed to load</option>'});
+  }).catch(function(e){$('bsel').innerHTML='<option>Error: '+esc(String(e))+'</option>'});
 }
+
 $('bsel').addEventListener('change',function(){
   bid=this.value;ents=[];sel={};q='';df={};$('q').value='';
   if(!bid){$('epanel').classList.add('hide');return}
   loadEnts();
 });
+
+/* ── Entities ── */
 function loadEnts(){
   $('elist').innerHTML='<div class="none">Loading…</div>';
   $('epanel').classList.remove('hide');
-  api('GET','api/entities?bridge_entry_id='+encodeURIComponent(bid)).then(function(d){
-    if(d.error){$('elist').innerHTML='<div class="msg err">'+esc(d.error)+'</div>';return}
-    ents=d.entities||[];render();
-  }).catch(function(){$('elist').innerHTML='<div class="msg err">Failed</div>'});
+  var br=bridges.find(function(b){return b.entry_id===bid});
+  if(!br){$('elist').innerHTML='<div class="msg err">Bridge not found</div>';return}
+
+  haGet('/states').then(function(states){
+    var f=br.filter;
+    var incE=new Set(f.include_entities),excE=new Set(f.exclude_entities);
+    var incD=new Set(f.include_domains),excD=new Set(f.exclude_domains);
+    ents=[];
+    states.forEach(function(s){
+      var eid=s.entity_id||'',dom=eid.split('.')[0]||'';
+      var ok=false;
+      if(incE.size&&incE.has(eid))ok=true;
+      else if(incD.size&&incD.has(dom))ok=true;
+      else if(!incE.size&&!incD.size)ok=true;
+      if(ok&&(excE.has(eid)||excD.has(dom)))ok=false;
+      if(ok)ents.push({entity_id:eid,domain:dom,friendly_name:(s.attributes||{}).friendly_name||eid,state:s.state||''});
+    });
+    ents.sort(function(a,b){return a.entity_id<b.entity_id?-1:1});
+    render();
+  }).catch(function(e){$('elist').innerHTML='<div class="msg err">'+esc(String(e))+'</div>'});
 }
 
-// Render
+/* ── Render ── */
 function filt(){
   var s=q.toLowerCase(),ad=Object.keys(df).filter(function(k){return df[k]});
   return ents.filter(function(e){
@@ -307,6 +208,7 @@ function render(){
   var ch='';Object.keys(doms).sort().forEach(function(d){ch+='<span class="chip'+(df[d]?' on':'')+'" data-d="'+esc(d)+'">'+esc(d)+'</span>'});
   $('chips').innerHTML=ch;
   $('chips').querySelectorAll('.chip').forEach(function(el){el.addEventListener('click',function(){df[el.getAttribute('data-d')]=!df[el.getAttribute('data-d')];render()})});
+
   var h='';
   f.forEach(function(e){
     h+='<div class="erow" data-e="'+esc(e.entity_id)+'"><input type="checkbox"'+(sel[e.entity_id]?' checked':'')+'><span class="nm"><span class="dm">'+esc(e.domain)+'</span>'+esc(e.friendly_name||e.entity_id)+'</span><span class="st">'+esc(e.state)+'</span></div>';
@@ -326,11 +228,12 @@ $('sa').addEventListener('change',function(){var c=this.checked;filt().forEach(f
 function upd(){var n=Object.keys(sel).filter(function(k){return sel[k]}).length;$('cnt').textContent=n?n+' selected':'';$('pkg').disabled=n===0}
 function ids(){return Object.keys(sel).filter(function(k){return sel[k]})}
 
-// Modal
+/* ── Package modal ── */
 $('pkg').addEventListener('click',function(){$('mn').value='';$('mt').value='lock';$('mg').checked=true;$('mbg').classList.remove('hide');rslots()});
 $('mc').addEventListener('click',cm);$('mbg').addEventListener('click',function(e){if(e.target===$('mbg'))cm()});
 $('mt').addEventListener('change',rslots);
 function cm(){$('mbg').classList.add('hide')}
+
 function rslots(){
   var t=TM[$('mt').value]||'security_lock',sl=SLOTS[t]||{},i=ids();
   var h='<label style="font-size:12px;color:var(--dim)">Slot mapping</label>';
@@ -340,6 +243,7 @@ function rslots(){
   });
   $('ms').innerHTML=h;suggest(t,i);
 }
+
 function suggest(t,i){
   var bd={};i.forEach(function(e){var d=e.split('.')[0];if(!bd[d])bd[d]=[];bd[d].push(e)});
   $('ms').querySelectorAll('select.sl').forEach(function(s){
@@ -357,19 +261,48 @@ function suggest(t,i){
     if(v)s.value=v;
   });
 }
+
+/* ── Create accessory via config flow ── */
 $('mk').addEventListener('click',function(){
   var btn=$('mk');btn.disabled=true;btn.textContent='Creating…';
+  var atype=$('mt').value;
+  var tmpl=TM[atype]||'security_lock';
   var sm={};$('ms').querySelectorAll('select.sl').forEach(function(s){var k=s.getAttribute('data-s');if(k&&s.value)sm[k]=s.value});
-  api('POST','api/package',{bridge_entry_id:bid,display_name:$('mn').value||'Accessory',accessory_type:$('mt').value,entity_ids:ids(),slot_mapping:sm,hide_sources:$('mg').checked})
-  .then(function(d){
+  var flowData={
+    template_id:tmpl,
+    slots:sm,
+    homekit_bridge_entry_id:bid,
+    automated_ghosting:$('mg').checked,
+    friendly_name:$('mn').value||'Accessory'
+  };
+
+  haPost('/config/config_entries/flow',{handler:'homekit_architect',show_advanced_options:false})
+  .then(function(step){return walkFlow(step,flowData)})
+  .then(function(result){
     btn.disabled=false;btn.textContent='Create';
-    if(d.ok){cm();sel={};render();toast('Created "'+esc(d.title)+'"','ok')}
-    else toast(d.error||'Failed','err');
-  }).catch(function(){btn.disabled=false;btn.textContent='Create';toast('Request failed','err')});
+    if(result.type==='create_entry'){cm();sel={};render();toast('Created "'+esc(result.title||flowData.friendly_name)+'"','ok')}
+    else toast(result.reason||result.error||'Could not create accessory','err');
+  })
+  .catch(function(e){btn.disabled=false;btn.textContent='Create';toast(String(e),'err')});
 });
+
+function walkFlow(step,fd){
+  if(!step||!step.flow_id)return Promise.resolve({type:'abort',reason:'No flow_id'});
+  if(step.type==='create_entry'||step.type==='abort')return Promise.resolve(step);
+  if(step.type!=='form')return Promise.resolve({type:'abort',reason:'Unexpected: '+step.type});
+  var sid=step.step_id,fid=step.flow_id,body={};
+  if(sid==='user')body={template_id:fd.template_id};
+  else if(sid==='slots')body=fd.slots;
+  else if(sid==='bridge')body={homekit_bridge_entry_id:fd.homekit_bridge_entry_id};
+  else if(sid==='ghosting')body={automated_ghosting:fd.automated_ghosting,friendly_name:fd.friendly_name};
+  else if(sid==='panel')body=fd;
+  else return Promise.resolve({type:'abort',reason:'Unknown step: '+sid});
+  return haPost('/config/config_entries/flow/'+fid,body).then(function(next){return walkFlow(next,fd)});
+}
 
 function toast(t,c){$('toast').innerHTML='<div class="msg '+c+'">'+t+'</div>';setTimeout(function(){$('toast').innerHTML=''},6000)}
 
+/* ── Init ── */
 loadBridges();
 })();
 </script>
@@ -378,56 +311,20 @@ loadBridges();
 """
 
 
-# -- HTTP handler ----------------------------------------------------------
-
-class H(BaseHTTPRequestHandler):
-    def log_message(self, f, *a):
-        sys.stderr.write("[server] " + f % a + "\n")
-
-    def _j(self, code, data):
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
-
-    def _body(self):
-        n = int(self.headers.get("Content-Length", 0))
-        return json.loads(self.rfile.read(n).decode()) if n else {}
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        sys.stderr.write("[server] " + fmt % args + "\n")
 
     def do_GET(self):
-        p = urlparse(self.path).path.rstrip("/") or "/"
-        if p == "/":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(HTML.encode())
-            return
-        if p == "/api/bridges":
-            self._j(200, api_bridges())
-            return
-        if p.startswith("/api/entities"):
-            qs = urlparse(self.path).query
-            params = dict(x.split("=", 1) for x in qs.split("&") if "=" in x)
-            bid = urllib.parse.unquote(params.get("bridge_entry_id", ""))
-            self._j(200 if bid else 400, api_entities(bid) if bid else {"error": "bridge_entry_id required"})
-            return
-        self.send_response(404)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
-
-    def do_POST(self):
-        p = urlparse(self.path).path.rstrip("/") or "/"
-        if p == "/api/package":
-            self._j(200, api_package(self._body()))
-            return
-        self.send_response(404)
-        self.end_headers()
+        self.wfile.write(HTML.encode())
 
 
 def main():
-    token, base = _token()
-    source = "SUPERVISOR_TOKEN" if os.environ.get("SUPERVISOR_TOKEN") else ("ha_token option" if token else "none")
-    sys.stderr.write(f"[HomeKit Architect] Auth: {source} (token len={len(token)})\n")
-    HTTPServer(("0.0.0.0", LISTEN_PORT), H).serve_forever()
+    sys.stderr.write("[HomeKit Architect] UI server on port %d\n" % LISTEN_PORT)
+    HTTPServer(("0.0.0.0", LISTEN_PORT), Handler).serve_forever()
 
 
 if __name__ == "__main__":
