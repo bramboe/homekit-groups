@@ -1,5 +1,0 @@
-# Friendly labels for the add-on Configuration tab (Settings → Apps → HomeKit Entity Architect → Configuration)
-configuration:
-  reinstall_on_start:
-    name: "Reinstall integration on start"
-    description: "When enabled (default), the integration is copied to custom_components each time the add-on starts. Disable to only reinstall from the Web UI."
