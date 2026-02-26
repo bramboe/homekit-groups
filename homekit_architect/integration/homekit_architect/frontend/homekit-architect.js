@@ -13,9 +13,9 @@ const ACCESSORY_TYPES = [
 
 const SLOTS_BY_TEMPLATE = {
   security_lock: {
-    action_slot: "Lock actuator (switch/lock)",
-    state_slot: "State sensor (e.g. door contact)",
-    battery_slot: "Battery (optional)",
+      action_slot: "Lock actuator (switch/lock)",
+      state_slot: "State sensor (e.g. door contact)",
+      battery_slot: "Battery (optional)",
     obstruction_slot: "Obstruction/jam (optional)",
   },
   garage_door: {
@@ -182,6 +182,7 @@ class HomeKitArchitectPanel extends HTMLElement {
     _suggestSlotMapping(accessoryType) {
       const typeInfo = ACCESSORY_TYPES.find((t) => t.value === accessoryType);
       const templateId = typeInfo?.template_id || "security_lock";
+      const slots = SLOTS_BY_TEMPLATE[templateId] || {};
       const ids = Array.from(this._selectedIds);
       const byDomain = {};
       ids.forEach((eid) => {
