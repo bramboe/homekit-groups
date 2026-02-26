@@ -15,7 +15,13 @@ This add-on **installs** the HomeKit Entity Architect integration into your Home
 
 When you **Start** the add-on, it installs the integration into your config folder and runs a small configuration server. After you restart Home Assistant, you can add the integration and create virtual accessories (e.g. Smart Lock, Garage Door) from slot entities and optionally hide the raw entities on your HomeKit Bridge (ghosting).
 
-## Add-on configuration page (Web UI)
+## Add-on Configuration tab
+
+In **Settings → Apps → HomeKit Entity Architect → Configuration** you can set:
+
+- **Reinstall integration on start** – When enabled (default), the integration is copied into `custom_components` every time the add-on starts. Turn this off if you only want to reinstall from the Web UI (e.g. to avoid overwriting local changes).
+
+## Add-on Web UI
 
 Open the add-on and click **Open Web UI** (or the add-on’s **Open** button when ingress is enabled). The configuration page lets you:
 
