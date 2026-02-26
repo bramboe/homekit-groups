@@ -28,6 +28,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the HomeKit Entity Architect integration (panel + WebSocket API)."""
     async_register_websocket_handlers(hass)
 
+    # Serve panel static files and register the config panel
     frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
     if os.path.isdir(frontend_path):
         await hass.http.async_register_static_paths(
@@ -81,7 +82,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle config entry options/update."""
+    """Handle config entry options/update (e.g. ghosting toggle or bridge change)."""
     if entry.data.get(CONF_AUTOMATED_GHOSTING) and entry.data.get(
         CONF_HOMEKIT_BRIDGE_ENTRY_ID
     ):
