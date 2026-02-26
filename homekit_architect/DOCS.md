@@ -9,7 +9,7 @@ This add-on **installs** the HomeKit Entity Architect integration into your Home
 3. Click **Add**, then **Close**.
 4. Find **HomeKit Entity Architect** in the add-on list, click **Install**, then **Start**.
 5. **Restart Home Assistant once** (Settings → System → Restart, or use **Restart Home Assistant** in the add-on Web UI). Home Assistant only loads custom integrations at startup, so this one-time restart is required—same as for any custom integration.
-6. Go to **Settings** → **Devices & services** → **Add integration** → search for **HomeKit Entity Architect** and complete the setup.
+6. Go to **Settings** → **Devices & services** → **Add integration** → search for **HomeKit Entity Architect** and complete the setup. You must add the integration at least once so the panel and WebSocket API are active (you can complete the flow without creating any accessories).
 
 ## What it does
 
@@ -33,6 +33,10 @@ On the **settings** page (add-on URL + `/settings`):
 ## Updating
 
 Update the add-on from the Add-on store, then **Start** it again to overwrite the integration files. Restart Home Assistant once to load the new version (same reason as above: HA loads custom integrations at startup).
+
+## Panel shows blank
+
+If the HomeKit Architect panel is empty: (1) Make sure you have **added the integration** at least once (Settings → Devices & services → Add integration → HomeKit Entity Architect). (2) Restart Home Assistant after installing or updating the add-on. (3) Hard-refresh the frontend (Ctrl+Shift+R or clear frontend cache in Developer tools). (4) In the browser (F12 → Console), check for errors or a 404 on `/homekit_architect_panel/homekit-architect.js`.
 
 ## Requirements
 
