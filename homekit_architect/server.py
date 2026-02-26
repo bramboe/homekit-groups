@@ -149,8 +149,10 @@ function loadBridges(){
     entries.forEach(function(e){
       if(e.domain!=='homekit')return;
       var opts=e.options||{};
-      if(opts.homekit_mode!=='bridge')return;
-      var f=opts.filter||{};
+      var data=e.data||{};
+      var mode=opts.homekit_mode||data.homekit_mode||'bridge';
+      if(mode==='accessory')return;
+      var f=opts.filter||data.filter||{};
       bridges.push({entry_id:e.entry_id,title:e.title||'HomeKit Bridge',filter:{
         include_entities:f.include_entities||[],exclude_entities:f.exclude_entities||[],
         include_domains:f.include_domains||[],exclude_domains:f.exclude_domains||[]
@@ -158,6 +160,7 @@ function loadBridges(){
     });
     var h='<option value="">Select a bridge…</option>';
     bridges.forEach(function(b){h+='<option value="'+esc(b.entry_id)+'">'+esc(b.title)+'</option>'});
+    if(!bridges.length)h='<option value="">No HomeKit bridges found</option>';
     $('bsel').innerHTML=h;
   }).catch(function(e){$('bsel').innerHTML='<option>Error: '+esc(String(e))+'</option>'});
 }
