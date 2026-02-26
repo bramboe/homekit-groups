@@ -154,10 +154,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/") or "/"
         if path == "/" or path == "":
-            # Send users straight to the real panel (manage bridges, package accessories)
-            self.send_response(302)
-            self.send_header("Location", "/config/homekit-architect")
+            # Navigate the top window to the panel (avoids iframe embedding = duplicate sidebar + blank)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
+            self.wfile.write(
+                b"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>HomeKit Architect</title>"""
+                b"""<script>window.top.location.href="/config/homekit-architect";</script>"""
+                b"""</head><body><p>Opening HomeKit Architect&hellip; <a href="/config/homekit-architect">Click here</a> if not redirected.</p></body></html>"""
+            )
             return
         if path == "/settings" or path == "/settings/":
             self.send_response(200)
