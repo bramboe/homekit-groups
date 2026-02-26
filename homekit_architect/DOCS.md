@@ -23,12 +23,14 @@ In **Settings → Apps → HomeKit Entity Architect → Configuration** you can 
 
 ## Add-on Web UI
 
-Open the add-on and click **Open Web UI** (or the **HomeKit Architect** sidebar icon). The UI shows the **management panel** in place where you choose a bridge, pick entities, and package accessories—no redirect, so it loads reliably. Use the top bar for **Add-on settings** or to open in a new tab. To reinstall the integration or restart Home Assistant, open the add-on’s Web UI and add **`/settings`** to the URL, or use the add-on **Configuration** tab and **Settings → System → Restart**.
+Open the add-on and click **Open Web UI** (or the **HomeKit Architect** sidebar icon). You see the app dashboard:
 
-On the **settings** page (add-on URL + `/settings`):
-- **See status** – Whether the integration is installed and where.
-- **Reinstall integration** – Copy the integration again into `custom_components` (e.g. after updating the add-on).
+- **Open HomeKit Architect panel** – Opens the full panel in Home Assistant (bridge list, entity picker, Package as Accessory). Use this for day-to-day setup.
+- **Install status** – Shows where the integration is installed.
+- **Reinstall integration** – Copies the integration again (e.g. after an app update).
 - **Restart Home Assistant** – Link to the server control page.
+
+The app serves its own UI on the ingress port ([per the app tutorial](https://developers.home-assistant.io/docs/apps/tutorial/)); there is no redirect, so the screen is never blank.
 
 ## Updating
 
