@@ -53,7 +53,18 @@ class HomeKitArchitectPanel extends HTMLElement {
     }
 
     connectedCallback() {
-      this._render();
+      try {
+        this._render();
+      } catch (e) {
+        const root = this.shadowRoot;
+        if (root) {
+          root.innerHTML = `
+            <style>:host { display: block; padding: 16px; font-family: sans-serif; } .err { color: #f44336; }</style>
+            <h1>HomeKit Accessory Architect</h1>
+            <p class="err">Panel error: ${String(e?.message || e)}</p>
+          `;
+        }
+      }
     }
 
     async _wsSend(type, extra = {}) {
@@ -232,7 +243,7 @@ class HomeKitArchitectPanel extends HTMLElement {
       if (!this._hass) {
         root.innerHTML = `
           <style>
-            :host { display: block; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
+            :host { display: block; min-height: 300px; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
             .loading-msg { color: var(--secondary-text-color); padding: 24px; }
           </style>
           <h1>HomeKit Accessory Architect</h1>
@@ -253,7 +264,7 @@ class HomeKitArchitectPanel extends HTMLElement {
 
       root.innerHTML = `
         <style>
-          :host { display: block; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
+          :host { display: block; min-height: 300px; padding: 16px; font-family: var(--mdc-typography-font-family, Roboto, sans-serif); }
           h1 { font-size: 24px; margin: 0 0 16px 0; }
           .card { background: var(--ha-card-background, var(--card-background-color, #1c1c1c)); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
           select, input[type="text"] { width: 100%; max-width: 400px; padding: 8px 12px; font-size: 14px; border-radius: 4px; margin-bottom: 8px; box-sizing: border-box; }
@@ -428,5 +439,3 @@ class HomeKitArchitectPanel extends HTMLElement {
   }
 
   customElements.define("homekit-architect-panel", HomeKitArchitectPanel);
-
-export default HomeKitArchitectPanel;
