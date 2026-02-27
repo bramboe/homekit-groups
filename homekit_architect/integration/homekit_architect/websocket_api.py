@@ -152,6 +152,7 @@ async def ws_package_accessory(
         connection.send_error(msg["id"], "invalid_template", "Template not found")
         return
 
+    # Build slots from slot_mapping; ensure required slots are filled from entity_ids if not mapped
     slots = _build_slots_from_mapping(template, slot_mapping, entity_ids)
     for req in template["required_slots"]:
         if not slots.get(req):
@@ -162,6 +163,8 @@ async def ws_package_accessory(
             )
             return
 
+    # Create config entry via flow (panel source) - one-step create, no UI
+    # Panel data in context so async_step_user can forward to async_step_panel
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={
@@ -193,7 +196,7 @@ async def ws_package_accessory(
 
 
 def _accessory_type_to_template_id(accessory_type: str) -> str | None:
-    """Map UI accessory type to our template_id."""
+    """Map UI accessory type (fan, lock, cover, light) to our template_id."""
     at = (accessory_type or "").lower()
     if at in ("lock", "security", "smart_lock"):
         return "security_lock"
@@ -211,7 +214,7 @@ def _build_slots_from_mapping(
     slot_mapping: dict[str, str],
     entity_ids: list[str],
 ) -> dict[str, str]:
-    """Build slots dict from panel slot_mapping."""
+    """Build slots dict from panel slot_mapping; suggest defaults from entity_ids for unmapped slots."""
     slots = dict(slot_mapping)
     required = set(template["required_slots"])
     optional = set(template.get("optional_slots") or [])
