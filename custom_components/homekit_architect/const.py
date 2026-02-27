@@ -13,6 +13,7 @@ CONF_ARCHITECT_ENTITY_FRIENDLY_NAME = "friendly_name"
 
 # Stored in Architect entry options for cleanup when entity may already be gone
 OPTION_GHOSTING_VIRTUAL_ENTITY_ID = "_ghosting_virtual_entity_id"
+OPTION_GHOSTING_VIRTUAL_ENTITY_IDS = "_ghosting_virtual_entity_ids"
 
 # HomeKit bridge filter keys
 CONF_FILTER = "filter"
@@ -55,6 +56,40 @@ SLOT_TIMER = "timer_slot"
 # Combo templates: one accessory with multiple services (e.g. Fan + Light)
 SLOT_FAN_SWITCH = "fan_switch_slot"
 SLOT_LIGHT_SWITCH = "light_switch_slot"
+
+# Generic multi-service: 2–8 controls of any mix of supported entity types
+SLOT_TERTIARY = "tertiary_slot"
+SLOT_QUATERNARY = "quaternary_slot"
+SLOT_QUINARY = "quinary_slot"
+SLOT_SENARY = "senary_slot"
+SLOT_SEPTENARY = "septenary_slot"
+SLOT_OCTONARY = "octonary_slot"
+MULTI_SERVICE_SLOTS = [
+    SLOT_PRIMARY,
+    SLOT_SECONDARY,
+    SLOT_TERTIARY,
+    SLOT_QUATERNARY,
+    SLOT_QUINARY,
+    SLOT_SENARY,
+    SLOT_SEPTENARY,
+    SLOT_OCTONARY,
+]
+# Entity domain -> platform name for multi_service (input_boolean treated as switch)
+MULTI_SERVICE_DOMAIN_TO_PLATFORM = {
+    "switch": "switch",
+    "input_boolean": "switch",
+    "light": "light",
+    "fan": "fan",
+    "lock": "lock",
+    "cover": "cover",
+    "climate": "climate",
+    "media_player": "media_player",
+    "humidifier": "humidifier",
+    "alarm_control_panel": "alarm_control_panel",
+    "binary_sensor": "binary_sensor",
+    "sensor": "sensor",
+    "camera": "camera",
+}
 
 # ── Template definitions ─────────────────────────────────────────────────
 # Each template maps to one HA platform and defines required/optional slots.
@@ -206,6 +241,29 @@ TEMPLATES = {
             SLOT_LIGHT_SWITCH: "Light on/off",
         },
         "platform_slots": {"fan": SLOT_FAN_SWITCH, "light": SLOT_LIGHT_SWITCH},
+    },
+    "multi_service": {
+        "name": "Multi-Service",
+        "platforms": list(dict.fromkeys(MULTI_SERVICE_DOMAIN_TO_PLATFORM.values())),
+        "required_slots": [SLOT_PRIMARY, SLOT_SECONDARY],
+        "optional_slots": [
+            SLOT_TERTIARY,
+            SLOT_QUATERNARY,
+            SLOT_QUINARY,
+            SLOT_SENARY,
+            SLOT_SEPTENARY,
+            SLOT_OCTONARY,
+        ],
+        "slot_labels": {
+            SLOT_PRIMARY: "Control 1",
+            SLOT_SECONDARY: "Control 2",
+            SLOT_TERTIARY: "Control 3",
+            SLOT_QUATERNARY: "Control 4",
+            SLOT_QUINARY: "Control 5",
+            SLOT_SENARY: "Control 6",
+            SLOT_SEPTENARY: "Control 7",
+            SLOT_OCTONARY: "Control 8",
+        },
     },
     "air_purifier": {
         "name": "Air Purifier",
