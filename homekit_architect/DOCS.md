@@ -41,6 +41,13 @@ The app serves its own UI on the ingress port ([per the app tutorial](https://de
 
 If the HomeKit Architect panel is empty: (1) Make sure you have **added the integration** at least once (Settings → Devices & services → Add integration → HomeKit Entity Architect). (2) Restart Home Assistant after installing or updating the add-on. (3) Hard-refresh the frontend (Ctrl+Shift+R or clear frontend cache in Developer tools). (4) In the browser (F12 → Console), check for errors or a 404 on `/homekit_architect_panel/homekit-architect.js`.
 
+## Uninstalling / Removing data
+
+To fully remove the integration and clear the HomeKit bridge (so grouped entities no longer appear in the Home app):
+
+1. **Remove the integration first** – **Settings** → **Devices & services** → **HomeKit Entity Architect** → **⋮** → **Delete** → choose **Remove data**. This unloads all Architect packages and cleans each HomeKit bridge’s filter (excluded slot entities and included virtual entities are reverted).
+2. Then **uninstall the add-on** – **Settings** → **Add-ons** (or **Apps**) → **HomeKit Entity Architect** → **Uninstall**. If you use “Remove data” on the add-on only, the integration and its config entries may still be present (the add-on only clears its own data), so the bridge filter is cleaned when you remove the integration in step 1.
+
 ## Requirements
 
 - Home Assistant OS or Supervised installation (so the add-on can access the config directory).
