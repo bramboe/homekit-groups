@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from copy import deepcopy
 
@@ -84,6 +85,8 @@ async def async_apply_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     options[CONF_FILTER] = filt
     hass.config_entries.async_update_entry(homekit_entry, options=options)
+    # Delay reload so the bridge can release its port before restarting (avoids Errno 98)
+    await asyncio.sleep(2.5)
     await hass.config_entries.async_reload(homekit_entry.entry_id)
     _LOGGER.info(
         "HomeKit Architect: applied ghosting for entry %s on bridge %s",
@@ -127,6 +130,7 @@ async def async_remove_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None
 
     options[CONF_FILTER] = filt
     hass.config_entries.async_update_entry(homekit_entry, options=options)
+    await asyncio.sleep(2.5)
     await hass.config_entries.async_reload(homekit_entry.entry_id)
     _LOGGER.info(
         "HomeKit Architect: removed ghosting for entry %s from bridge %s",
