@@ -1,4 +1,6 @@
-"""Virtual camera platform for the 'camera' template (proxies a camera entity)."""
+"""Virtual camera platform for the 'camera' template.
+
+Template pattern: state and stream from slot camera entity; commands by slot domain."""
 
 from __future__ import annotations
 
