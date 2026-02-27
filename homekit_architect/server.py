@@ -35,6 +35,10 @@ select:focus,input:focus{border-color:var(--pri)}
 .erow{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
 .erow:hover{background:rgba(255,255,255,.04)}
 .erow .nm{flex:1;font-size:14px}.erow .dm{font-size:11px;color:var(--dim);margin-right:6px}.erow .st{font-size:12px;color:var(--dim)}
+.plist{max-height:260px;overflow-y:auto;border:1px solid var(--bdr);border-radius:6px}
+.prow{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+.prow .pname{flex:1;font-size:14px}
+.prow .pmeta{font-size:11px;color:var(--dim)}
 .btn{display:inline-block;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;border:none}
 .bp{background:var(--pri);color:#fff}.bp:disabled{opacity:.35;cursor:default}
 .bs{background:#333;color:var(--txt)}
@@ -73,6 +77,11 @@ select:focus,input:focus{border-color:var(--pri)}
   </div>
   <div class="chips" id="chips"></div>
   <div class="elist" id="elist"></div>
+</div>
+
+<div class="card" id="pkpanel">
+  <h2>Existing Architect packages</h2>
+  <div class="plist" id="plist"><div class="none">Loading…</div></div>
 </div>
 
 <div id="toast"></div>
@@ -168,7 +177,7 @@ function haPost(path,body){
 }
 
 /* ── Helpers ──── */
-var bridges=[],bid='',ents=[],sel={},q='',df={};
+var bridges=[],bid='',ents=[],sel={},q='',df={},packages=[];
 /* ── Auto-detect accessory type from selected entity domains ── */
 var DOMAIN_TO_TYPE={
   lock:'lock',alarm_control_panel:'security_system',
@@ -192,22 +201,33 @@ function esc(s){var d=document.createElement('div');d.textContent=s||'';return d
 function loadBridges(){
   haGet('/config/config_entries/entry').then(function(entries){
     bridges=[];
+    packages=[];
     entries.forEach(function(e){
-      if(e.domain!=='homekit')return;
-      var opts=e.options||{};
-      var data=e.data||{};
-      var mode=opts.homekit_mode||data.homekit_mode||'bridge';
-      if(mode==='accessory')return;
-      var f=opts.filter||data.filter||{};
-      bridges.push({entry_id:e.entry_id,title:e.title||'HomeKit Bridge',filter:{
-        include_entities:f.include_entities||[],exclude_entities:f.exclude_entities||[],
-        include_domains:f.include_domains||[],exclude_domains:f.exclude_domains||[]
-      }});
+      if(e.domain==='homekit'){
+        var opts=e.options||{};
+        var data=e.data||{};
+        var mode=opts.homekit_mode||data.homekit_mode||'bridge';
+        if(mode==='accessory')return;
+        var f=opts.filter||data.filter||{};
+        bridges.push({entry_id:e.entry_id,title:e.title||'HomeKit Bridge',filter:{
+          include_entities:f.include_entities||[],exclude_entities:f.exclude_entities||[],
+          include_domains:f.include_domains||[],exclude_domains:f.exclude_domains||[]
+        }});
+      }else if(e.domain==='homekit_architect'){
+        packages.push({
+          entry_id:e.entry_id,
+          title:e.title||((e.data||{}).friendly_name)||'Architect package',
+          template_id:(e.data||{}).template_id||'',
+          bridge_entry_id:(e.data||{}).homekit_bridge_entry_id||'',
+          automated_ghosting:(e.data||{}).automated_ghosting!==false
+        });
+      }
     });
     var h='<option value="">Select a bridge…</option>';
     bridges.forEach(function(b){h+='<option value="'+esc(b.entry_id)+'">'+esc(b.title)+'</option>'});
     if(!bridges.length)h='<option value="">No HomeKit bridges found</option>';
     $('bsel').innerHTML=h;
+    renderPackages();
   }).catch(function(e){$('bsel').innerHTML='<option>Error: '+esc(String(e))+'</option>'});
 }
 
@@ -216,6 +236,37 @@ $('bsel').addEventListener('change',function(){
   if(!bid){$('epanel').classList.add('hide');return}
   loadEnts();
 });
+
+function renderPackages(){
+  var el=$('plist');
+  if(!packages.length){
+    el.innerHTML='<div class="none">No Architect packages yet.</div>';
+    return;
+  }
+  var map={};
+  bridges.forEach(function(b){map[b.entry_id]=b.title});
+  var h='';
+  packages.forEach(function(p){
+    var bt=map[p.bridge_entry_id]||'Unknown bridge';
+    var type=p.template_id||'group';
+    h+='<div class="prow" data-id="'+esc(p.entry_id)+'">'
+      +'<div class="pname">'+esc(p.title)+'</div>'
+      +'<div class="pmeta">'+esc(type)+' · '+esc(bt)+'</div>'
+      +'<button class="btn bs" data-del="'+esc(p.entry_id)+'">Delete</button>'
+      +'</div>';
+  });
+  el.innerHTML=h;
+  el.querySelectorAll('button[data-del]').forEach(function(btn){
+    btn.addEventListener('click',function(ev){
+      var id=btn.getAttribute('data-del');
+      if(!confirm('Delete this package?'))return;
+      haPost('/config/config_entries/entry/'+id,{})
+      .then(function(){packages=packages.filter(function(p){return p.entry_id!==id});renderPackages()})
+      .catch(function(e){toast(String(e),'err')});
+      ev.stopPropagation();
+    });
+  });
+}
 
 /* ── Entities ── */
 function loadEnts(){
