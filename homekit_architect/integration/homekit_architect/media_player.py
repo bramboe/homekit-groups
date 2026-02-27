@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .base import ArchitectBase, domain_of
 from .const import SLOT_MEDIA, SLOT_POWER, SLOT_VOLUME
 
-HANDLED_TEMPLATES = ("television", "speaker")
+HANDLED_TEMPLATES = ("television", "speaker", "multi_service")
 
 
 async def async_setup_entry(
@@ -28,6 +28,12 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
+    if tid == "multi_service":
+        media_slots = [k for k, eid in slots.items() if eid and domain_of(eid) == "media_player"]
+        if not media_slots:
+            return
+        async_add_entities([ArchitectMediaPlayer(hass, entry, "speaker", slot_key=sk) for sk in media_slots])
+        return
     if not slots.get(SLOT_MEDIA):
         return
     async_add_entities([ArchitectMediaPlayer(hass, entry, tid)])
@@ -35,8 +41,15 @@ async def async_setup_entry(
 
 class ArchitectMediaPlayer(ArchitectBase, MediaPlayerEntity):
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, tid: str) -> None:
-        self._architect_init(hass, entry, "media_player")
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        tid: str,
+        slot_key: str | None = None,
+    ) -> None:
+        self._architect_init(hass, entry, "media_player", slot_key=slot_key)
+        self._media_slot = slot_key if slot_key else SLOT_MEDIA
         self._attr_device_class = (
             MediaPlayerDeviceClass.TV if tid == "television"
             else MediaPlayerDeviceClass.SPEAKER
@@ -52,7 +65,7 @@ class ArchitectMediaPlayer(ArchitectBase, MediaPlayerEntity):
 
     @callback
     def _update_state(self) -> None:
-        src = self._slot(SLOT_MEDIA)
+        src = self._slot(self._media_slot)
         st = self.hass.states.get(src) if src else None
         if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             try:
@@ -69,26 +82,24 @@ class ArchitectMediaPlayer(ArchitectBase, MediaPlayerEntity):
 
     async def async_added_to_hass(self) -> None:
         self._update_state()
-        await self._async_track_slots(SLOT_MEDIA, SLOT_POWER, SLOT_VOLUME)
+        await self._async_track_slots(self._media_slot, SLOT_POWER, SLOT_VOLUME)
 
     async def async_turn_on(self) -> None:
-        pwr = self._slot(SLOT_POWER) or self._slot(SLOT_MEDIA)
-        dom = domain_of(pwr)
-        svc = "turn_on" if dom != "media_player" else "turn_on"
-        await self._forward_service(pwr, svc)
+        pwr = self._slot(SLOT_POWER) or self._slot(self._media_slot)
+        await self._forward_service(pwr, "turn_on")
 
     async def async_turn_off(self) -> None:
-        pwr = self._slot(SLOT_POWER) or self._slot(SLOT_MEDIA)
+        pwr = self._slot(SLOT_POWER) or self._slot(self._media_slot)
         await self._forward_service(pwr, "turn_off")
 
     async def async_media_play(self) -> None:
-        await self._forward_service(self._slot(SLOT_MEDIA), "media_play")
+        await self._forward_service(self._slot(self._media_slot), "media_play")
 
     async def async_media_pause(self) -> None:
-        await self._forward_service(self._slot(SLOT_MEDIA), "media_pause")
+        await self._forward_service(self._slot(self._media_slot), "media_pause")
 
     async def async_set_volume_level(self, volume: float) -> None:
-        vol_eid = self._slot(SLOT_VOLUME) or self._slot(SLOT_MEDIA)
+        vol_eid = self._slot(SLOT_VOLUME) or self._slot(self._media_slot)
         dom = domain_of(vol_eid)
         if dom == "media_player":
             await self._forward_service(vol_eid, "volume_set", {"volume_level": volume})
