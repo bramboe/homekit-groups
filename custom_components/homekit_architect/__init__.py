@@ -42,14 +42,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not template:
         return False
 
-    platform = template["platform"]
+    platforms = template.get("platforms") or [template["platform"]]
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "entry": entry,
         "template_id": template_id,
         "template": template,
     }
 
-    await hass.config_entries.async_forward_entry_setups(entry, [platform])
+    await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
     if entry.data.get(CONF_AUTOMATED_GHOSTING) and entry.data.get(
         CONF_HOMEKIT_BRIDGE_ENTRY_ID
@@ -84,8 +84,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not template:
         return True
 
-    platform = template["platform"]
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, [platform])
+    platforms = template.get("platforms") or [template["platform"]]
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, platforms)
     if unload_ok:
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     return unload_ok
