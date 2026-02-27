@@ -8,5 +8,5 @@
   "integration_type": "helper",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/Homekit-Groups/Homekit-Groups/issues",
-  "version": "2.1.2"
+  "version": "2.2.7"
 }
