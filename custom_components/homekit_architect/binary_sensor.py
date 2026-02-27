@@ -1,4 +1,6 @@
-"""Virtual binary_sensor platform for 'doorbell' and 'programmable_switch'."""
+"""Virtual binary_sensor platform for 'doorbell' and 'programmable_switch'.
+
+Template pattern: state from slot entity (any domain with on/off or state)."""
 
 from __future__ import annotations
 
