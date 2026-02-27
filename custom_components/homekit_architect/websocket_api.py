@@ -20,6 +20,7 @@ from .const import (
     CONF_INCLUDE_DOMAINS,
     CONF_INCLUDE_ENTITIES,
     DOMAIN,
+    MULTI_SERVICE_DOMAIN_TO_PLATFORM,
     TEMPLATES,
 )
 
@@ -293,6 +294,10 @@ def _pick_fallback_template_id(entity_ids: list[str]) -> str | None:
 
     domains = [eid.split(".", 1)[0] for eid in entity_ids if "." in eid]
 
+    # Multiple entities (2–8) of any supported type → generic multi-service
+    if len(entity_ids) >= 2 and "multi_service" in TEMPLATES:
+        if set(domains) & set(MULTI_SERVICE_DOMAIN_TO_PLATFORM):
+            return "multi_service"
     # Prefer Fan + Light combo if both fan and light are selected
     if "fan" in domains and "light" in domains and "fan_light" in TEMPLATES:
         return "fan_light"
