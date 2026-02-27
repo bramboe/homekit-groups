@@ -11,9 +11,22 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base import ArchitectBase, domain_of
-from .const import SLOT_AIR_QUALITY, SLOT_BATTERY, SLOT_FILTER, SLOT_SPEED, SLOT_SWITCH
+from .const import (
+    SLOT_AIR_QUALITY,
+    SLOT_BATTERY,
+    SLOT_FILTER,
+    SLOT_SPEED,
+    SLOT_SWITCH,
+    TEMPLATES,
+)
 
-HANDLED_TEMPLATES = ("fan", "air_purifier")
+HANDLED_TEMPLATES = ("fan", "air_purifier", "fan_light")
+
+
+def _fan_switch_slot_key(template_id: str) -> str:
+    """Slot key for fan on/off (combo template uses fan_switch_slot)."""
+    t = TEMPLATES.get(template_id) or {}
+    return t.get("platform_slots", {}).get("fan") or SLOT_SWITCH
 
 
 async def async_setup_entry(
@@ -23,7 +36,8 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
-    if not slots.get(SLOT_SWITCH):
+    switch_key = _fan_switch_slot_key(tid)
+    if not slots.get(switch_key):
         return
     async_add_entities([ArchitectFan(hass, entry)])
 
@@ -32,6 +46,7 @@ class ArchitectFan(ArchitectBase, FanEntity):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self._architect_init(hass, entry, "fan")
+        self._switch_slot_key = _fan_switch_slot_key(entry.data.get("template_id", ""))
         features = FanEntityFeature(0)
         if self._slot(SLOT_SPEED):
             features |= FanEntityFeature.SET_SPEED
@@ -39,7 +54,7 @@ class ArchitectFan(ArchitectBase, FanEntity):
 
     @callback
     def _update_state(self) -> None:
-        src = self._slot(SLOT_SWITCH)
+        src = self._slot(self._switch_slot_key)
         st = self.hass.states.get(src) if src else None
         if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             self._attr_is_on = st.state == STATE_ON
@@ -63,20 +78,22 @@ class ArchitectFan(ArchitectBase, FanEntity):
 
     async def async_added_to_hass(self) -> None:
         self._update_state()
-        await self._async_track_slots(SLOT_SWITCH, SLOT_SPEED, SLOT_AIR_QUALITY, SLOT_FILTER, SLOT_BATTERY)
+        await self._async_track_slots(
+            self._switch_slot_key, SLOT_SPEED, SLOT_AIR_QUALITY, SLOT_FILTER, SLOT_BATTERY
+        )
 
     async def async_turn_on(self, percentage: int | None = None, **kwargs: Any) -> None:
-        eid = self._slot(SLOT_SWITCH)
+        eid = self._slot(self._switch_slot_key)
         data: dict[str, Any] = {}
         if percentage is not None and domain_of(eid) == "fan":
             data["percentage"] = percentage
         await self._forward_service(eid, "turn_on", data or None)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._forward_service(self._slot(SLOT_SWITCH), "turn_off")
+        await self._forward_service(self._slot(self._switch_slot_key), "turn_off")
 
     async def async_set_percentage(self, percentage: int) -> None:
-        eid = self._slot(SLOT_SPEED) or self._slot(SLOT_SWITCH)
+        eid = self._slot(SLOT_SPEED) or self._slot(self._switch_slot_key)
         dom = domain_of(eid)
         if dom == "fan":
             await self._forward_service(eid, "set_percentage", {"percentage": percentage})
