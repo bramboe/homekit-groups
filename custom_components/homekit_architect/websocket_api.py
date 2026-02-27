@@ -293,6 +293,9 @@ def _pick_fallback_template_id(entity_ids: list[str]) -> str | None:
 
     domains = [eid.split(".", 1)[0] for eid in entity_ids if "." in eid]
 
+    # Prefer Fan + Light combo if both fan and light are selected
+    if "fan" in domains and "light" in domains and "fan_light" in TEMPLATES:
+        return "fan_light"
     # Prefer a light-style template if there is any light entity
     if "light" in domains and "lightbulb" in TEMPLATES:
         return "lightbulb"
