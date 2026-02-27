@@ -82,15 +82,14 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Template selection (or panel shortcut)."""
+        """Template selection, or full-package shortcut from add-on panel."""
         if self.context.get("source") == "panel" and self.context.get("panel_package"):
             panel_data = self.context.get("panel_data") or {}
             return await self.async_step_panel(panel_data)
-        return await self._async_step_user_impl(user_input)
 
-    async def _async_step_user_impl(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+        if user_input is not None and CONF_SLOTS in user_input:
+            return await self.async_step_panel(user_input)
+
         if user_input is not None:
             self._template_id = user_input[CONF_TEMPLATE_ID]
             return await self.async_step_slots()
@@ -99,7 +98,13 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
-                {vol.Required(CONF_TEMPLATE_ID): vol.In(template_options)}
+                {
+                    vol.Required(CONF_TEMPLATE_ID): vol.In(template_options),
+                    vol.Optional(CONF_SLOTS): dict,
+                    vol.Optional(CONF_HOMEKIT_BRIDGE_ENTRY_ID): str,
+                    vol.Optional(CONF_AUTOMATED_GHOSTING): bool,
+                    vol.Optional(CONF_ARCHITECT_ENTITY_FRIENDLY_NAME): str,
+                }
             ),
         )
 
