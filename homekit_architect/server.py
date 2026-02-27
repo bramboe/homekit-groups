@@ -82,49 +82,35 @@ select:focus,input:focus{border-color:var(--pri)}
 <div class="mdl">
   <h2>Package as Accessory</h2>
   <div class="f"><label>Display name</label><input type="text" id="mn" placeholder="e.g. Ventilation Fan"></div>
-  <div class="f"><label>Accessory type</label><select id="mt">
-    <optgroup label="Security &amp; Access">
+  <div class="f"><label>Accessory type <span style="font-size:11px;color:var(--dim)">(auto-detected from selection)</span></label>
+    <select id="mt">
       <option value="lock">Door Lock</option>
       <option value="security_system">Security System</option>
       <option value="doorbell">Video Doorbell</option>
-    </optgroup>
-    <optgroup label="Doors, Gates &amp; Covers">
       <option value="garage_door">Garage Door</option>
       <option value="door">Door</option>
       <option value="window">Window</option>
       <option value="window_covering">Window Covering</option>
-    </optgroup>
-    <optgroup label="Lighting &amp; Power">
       <option value="lightbulb">Light</option>
       <option value="outlet">Outlet</option>
       <option value="switch">Switch</option>
-    </optgroup>
-    <optgroup label="Climate &amp; Environment">
       <option value="thermostat">Thermostat</option>
       <option value="fan">Fan</option>
       <option value="air_purifier">Air Purifier</option>
       <option value="humidifier">Humidifier</option>
       <option value="dehumidifier">Dehumidifier</option>
-    </optgroup>
-    <optgroup label="Water">
       <option value="sprinkler">Sprinkler</option>
       <option value="faucet">Faucet</option>
       <option value="shower">Shower Head</option>
-    </optgroup>
-    <optgroup label="Media">
       <option value="television">Television</option>
       <option value="speaker">Speaker</option>
-    </optgroup>
-    <optgroup label="Sensors">
       <option value="sensor">Sensor</option>
-    </optgroup>
-    <optgroup label="Other">
       <option value="camera">IP Camera</option>
       <option value="programmable_switch">Programmable Switch</option>
-    </optgroup>
-  </select></div>
+    </select>
+  </div>
   <div class="f"><label><input type="checkbox" id="mg" checked> Hide source entities from HomeKit</label></div>
-  <div class="f" id="ms"></div>
+  <div class="f" id="msel" style="font-size:12px;color:var(--dim)"></div>
   <div class="acts"><button class="btn bs" id="mc">Cancel</button><button class="btn bp" id="mk">Create</button></div>
 </div>
 </div>
@@ -183,31 +169,21 @@ function haPost(path,body){
 
 /* ── Helpers ──── */
 var bridges=[],bid='',ents=[],sel={},q='',df={};
-var SLOTS={
-  lock:          {action_slot:'Lock actuator',state_slot:'State sensor',battery_slot:'Battery (optional)',obstruction_slot:'Obstruction (optional)'},
-  security_system:{arm_slot:'Arm/Disarm control',state_slot:'State sensor',battery_slot:'Battery (optional)'},
-  doorbell:      {trigger_slot:'Doorbell trigger',camera_slot:'Camera stream (optional)',battery_slot:'Battery (optional)'},
-  garage_door:   {actuator_slot:'Open/Close actuator',position_sensor_slot:'Position sensor',obstruction_slot:'Obstruction (optional)',battery_slot:'Battery (optional)'},
-  door:          {actuator_slot:'Open/Close actuator',position_sensor_slot:'Position sensor',battery_slot:'Battery (optional)'},
-  window:        {actuator_slot:'Open/Close actuator',position_sensor_slot:'Position sensor',battery_slot:'Battery (optional)'},
-  window_covering:{position_slot:'Position control',tilt_slot:'Tilt control (optional)',battery_slot:'Battery (optional)'},
-  lightbulb:     {switch_slot:'On/Off control',brightness_slot:'Brightness (optional)',color_slot:'Color (optional)'},
-  outlet:        {switch_slot:'On/Off control',power_sensor_slot:'Power sensor (optional)'},
-  switch:        {switch_slot:'On/Off control',state_slot:'State sensor (optional)'},
-  thermostat:    {climate_slot:'Climate entity',temperature_sensor_slot:'Temperature sensor (optional)',humidity_sensor_slot:'Humidity sensor (optional)'},
-  fan:           {switch_slot:'On/Off control',speed_slot:'Speed control (optional)',battery_slot:'Battery (optional)'},
-  air_purifier:  {switch_slot:'On/Off control',air_quality_slot:'Air quality sensor (optional)',filter_slot:'Filter life (optional)'},
-  humidifier:    {switch_slot:'On/Off control',humidity_sensor_slot:'Humidity sensor (optional)',target_slot:'Target humidity (optional)'},
-  dehumidifier:  {switch_slot:'On/Off control',humidity_sensor_slot:'Humidity sensor (optional)',target_slot:'Target humidity (optional)'},
-  sprinkler:     {switch_slot:'On/Off control',timer_slot:'Timer/Duration (optional)'},
-  faucet:        {switch_slot:'On/Off control'},
-  shower:        {switch_slot:'On/Off control'},
-  television:    {media_slot:'Media player entity',power_slot:'Power control (optional)'},
-  speaker:       {media_slot:'Media player entity',volume_slot:'Volume control (optional)'},
-  sensor:        {primary_slot:'Primary sensor',secondary_slot:'Secondary sensor (optional)',battery_slot:'Battery (optional)'},
-  camera:        {camera_slot:'Camera entity',motion_slot:'Motion sensor (optional)'},
-  programmable_switch:{trigger_slot:'Trigger entity',battery_slot:'Battery (optional)'}
+/* ── Auto-detect accessory type from selected entity domains ── */
+var DOMAIN_TO_TYPE={
+  lock:'lock',alarm_control_panel:'security_system',
+  cover:'garage_door',light:'lightbulb',fan:'fan',
+  climate:'thermostat',media_player:'television',camera:'camera',
+  humidifier:'humidifier',sensor:'sensor',binary_sensor:'sensor',
+  switch:'switch',input_boolean:'switch'
 };
+function detectType(selectedIds){
+  for(var i=0;i<selectedIds.length;i++){
+    var dom=selectedIds[i].split('.')[0];
+    if(DOMAIN_TO_TYPE[dom])return DOMAIN_TO_TYPE[dom];
+  }
+  return 'switch';
+}
 
 function $(i){return document.getElementById(i)}
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
@@ -302,63 +278,16 @@ function upd(){var n=Object.keys(sel).filter(function(k){return sel[k]}).length;
 function ids(){return Object.keys(sel).filter(function(k){return sel[k]})}
 
 /* ── Package modal ── */
-$('pkg').addEventListener('click',function(){$('mn').value='';$('mt').value='lock';$('mg').checked=true;$('mbg').classList.remove('hide');rslots()});
+$('pkg').addEventListener('click',function(){
+  var i=ids();
+  var det=detectType(i);
+  $('mt').value=det;
+  $('mn').value='';$('mg').checked=true;
+  $('msel').textContent='Selected: '+i.join(', ');
+  $('mbg').classList.remove('hide');
+});
 $('mc').addEventListener('click',cm);$('mbg').addEventListener('click',function(e){if(e.target===$('mbg'))cm()});
-$('mt').addEventListener('change',rslots);
 function cm(){$('mbg').classList.add('hide')}
-
-function rslots(){
-  var t=$('mt').value,sl=SLOTS[t]||{},i=ids();
-  var keys=Object.keys(sl);
-  if(!keys.length){$('ms').innerHTML='<span style="font-size:12px;color:var(--dim)">No slot mapping needed for this type.</span>';return}
-  var h='<label style="font-size:12px;color:var(--dim)">Slot mapping</label>';
-  keys.forEach(function(k){
-    h+='<div style="margin:6px 0"><span style="font-size:12px;color:var(--dim)">'+esc(sl[k])+'</span><select class="sl" data-s="'+esc(k)+'"><option value="">--</option>';
-    i.forEach(function(e){h+='<option value="'+esc(e)+'">'+esc(e)+'</option>'});h+='</select></div>';
-  });
-  $('ms').innerHTML=h;suggest(t,i);
-}
-
-function suggest(t,i){
-  var bd={};i.forEach(function(e){var d=e.split('.')[0];if(!bd[d])bd[d]=[];bd[d].push(e)});
-  var first=function(){return i[0]||''};
-  var fromDom=function(doms){for(var x=0;x<doms.length;x++){var r=bd[doms[x]];if(r&&r.length)return r[0]}return ''};
-  var hints={
-    action_slot:       function(){return fromDom(['lock','switch'])||first()},
-    arm_slot:          function(){return fromDom(['alarm_control_panel','switch'])||first()},
-    trigger_slot:      function(){return fromDom(['binary_sensor','input_boolean','switch'])||first()},
-    actuator_slot:     function(){return fromDom(['cover','switch'])||first()},
-    switch_slot:       function(){return fromDom(['switch','light','fan','input_boolean'])||first()},
-    climate_slot:      function(){return fromDom(['climate'])||first()},
-    media_slot:        function(){return fromDom(['media_player'])||first()},
-    camera_slot:       function(){return fromDom(['camera'])||''},
-    primary_slot:      function(){return fromDom(['sensor','binary_sensor'])||first()},
-    position_slot:     function(){return fromDom(['cover'])||first()},
-    state_slot:        function(){return fromDom(['binary_sensor','sensor'])||i[1]||''},
-    position_sensor_slot:function(){return fromDom(['binary_sensor','cover'])||i[1]||''},
-    battery_slot:      function(){return fromDom(['sensor'])||''},
-    obstruction_slot:  function(){return fromDom(['binary_sensor'])?((bd.binary_sensor||[])[1]||''):''},
-    brightness_slot:   function(){return fromDom(['light'])||''},
-    color_slot:        function(){return fromDom(['light'])||''},
-    speed_slot:        function(){return fromDom(['fan'])||''},
-    tilt_slot:         function(){return ''},
-    power_slot:        function(){return fromDom(['switch','input_boolean'])||''},
-    power_sensor_slot: function(){return fromDom(['sensor'])||''},
-    volume_slot:       function(){return fromDom(['media_player','number','input_number'])||''},
-    air_quality_slot:  function(){return fromDom(['sensor'])||''},
-    filter_slot:       function(){return ''},
-    humidity_sensor_slot:function(){return fromDom(['sensor'])||''},
-    target_slot:       function(){return fromDom(['number','input_number'])||''},
-    temperature_sensor_slot:function(){return fromDom(['sensor'])||''},
-    timer_slot:        function(){return fromDom(['timer','input_number'])||''},
-    motion_slot:       function(){return fromDom(['binary_sensor'])||''},
-    secondary_slot:    function(){return (bd.sensor||[])[1]||''}
-  };
-  $('ms').querySelectorAll('select.sl').forEach(function(s){
-    var k=s.getAttribute('data-s');
-    var fn=hints[k];if(fn){var v=fn();if(v)s.value=v}
-  });
-}
 
 /* ── WebSocket helper ── */
 function wsCall(type,data){
@@ -367,7 +296,6 @@ function wsCall(type,data){
       var proto=location.protocol==='https:'?'wss://':'ws://';
       var ws=new WebSocket(proto+location.host+'/api/websocket');
       var mid=1;
-      ws.onopen=function(){};
       ws.onerror=function(){fail(new Error('WebSocket connection failed'))};
       ws.onmessage=function(evt){
         var m=JSON.parse(evt.data);
@@ -380,37 +308,19 @@ function wsCall(type,data){
   });
 }
 
-/* ── REST config flow fallback (walks steps one by one) ── */
-function restCreate(fd){
-  return haPost('/config/config_entries/flow',{handler:'homekit_architect',show_advanced_options:false})
-  .then(function(step){return walkFlow(step,fd)});
-}
-function walkFlow(step,fd){
-  if(!step||!step.flow_id)return Promise.resolve({type:'abort',reason:'No flow_id'});
-  if(step.type==='create_entry'||step.type==='abort')return Promise.resolve(step);
-  if(step.type!=='form')return Promise.resolve({type:'abort',reason:'Unexpected: '+step.type});
-  var sid=step.step_id,fid=step.flow_id,body={};
-  if(sid==='user') body={template_id:fd.template_id};
-  else if(sid==='slots'){body={};var all=fd.slots||{};Object.keys(all).forEach(function(k){if(all[k])body[k]=all[k]})}
-  else if(sid==='bridge') body={homekit_bridge_entry_id:fd.homekit_bridge_entry_id};
-  else if(sid==='ghosting') body={automated_ghosting:fd.automated_ghosting,friendly_name:fd.friendly_name};
-  else return Promise.resolve({type:'abort',reason:'Unknown step: '+sid});
-  return haPost('/config/config_entries/flow/'+fid,body).then(function(next){return walkFlow(next,fd)});
-}
-
-/* ── Create accessory: try WebSocket, fall back to REST ── */
+/* ── Create accessory ── */
 $('mk').addEventListener('click',function(){
   var btn=$('mk');btn.disabled=true;btn.textContent='Creating…';
   var atype=$('mt').value;
-  var sm={};$('ms').querySelectorAll('select.sl').forEach(function(s){var k=s.getAttribute('data-s');if(k&&s.value)sm[k]=s.value});
   var name=$('mn').value||'Accessory';
+  var selected=ids();
 
   function onOk(title){btn.disabled=false;btn.textContent='Create';cm();sel={};render();toast('Created "'+esc(title)+'"','ok')}
   function onErr(e){btn.disabled=false;btn.textContent='Create';toast(String(e),'err')}
 
   wsCall('homekit_architect/package_accessory',{
     bridge_entry_id:bid,display_name:name,accessory_type:atype,
-    entity_ids:ids(),slot_mapping:sm,hide_sources:$('mg').checked
+    entity_ids:selected,slot_mapping:{},hide_sources:$('mg').checked
   })
   .then(function(r){onOk(r.title||name)})
   .catch(function(wsErr){
@@ -421,14 +331,14 @@ $('mk').addEventListener('click',function(){
 
 function showRestartBanner(detail){
   $('toast').innerHTML='<div class="msg err" style="line-height:1.6">'
-    +'Home Assistant needs a restart to load the updated integration.<br>'
+    +'Home Assistant needs a restart to load the integration.<br>'
     +'<small style="color:#aaa">'+esc(detail)+'</small><br>'
     +'<button id="rbtn" class="btn bp" style="margin-top:8px">Restart Home Assistant</button>'
     +'</div>';
   $('rbtn').addEventListener('click',function(){
     $('rbtn').disabled=true;$('rbtn').textContent='Restarting…';
     haPost('/services/homeassistant/restart',{})
-    .then(function(){$('toast').innerHTML='<div class="msg ok">Restarting… page will reload in 60 seconds.</div>';setTimeout(function(){location.reload()},60000)})
+    .then(function(){$('toast').innerHTML='<div class="msg ok">Restarting… the page will reload in 90 seconds.</div>';setTimeout(function(){location.reload()},90000)})
     .catch(function(e){$('toast').innerHTML='<div class="msg err">Could not restart: '+esc(String(e))+'</div>'});
   });
 }
