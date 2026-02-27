@@ -64,7 +64,10 @@ select:focus,input:focus{border-color:var(--pri)}
 <div class="card">
   <h2>Bridge</h2>
   <label class="field">Active HomeKit bridges</label>
-  <select id="bsel"><option value="">Loading…</option></select>
+  <div class="bar">
+    <select id="bsel"><option value="">Loading…</option></select>
+    <button type="button" class="btn bp" id="reloadBridge" disabled title="Reload the selected bridge so Home app picks up new or changed accessories">Reload bridge</button>
+  </div>
 </div>
 
 <div class="card hide" id="epanel">
@@ -247,8 +250,18 @@ function loadBridges(){
 
 $('bsel').addEventListener('change',function(){
   bid=this.value;ents=[];sel={};q='';df={};$('q').value='';
+  $('reloadBridge').disabled=!bid;
   if(!bid){$('epanel').classList.add('hide');return}
   loadEnts();
+});
+
+$('reloadBridge').addEventListener('click',function(){
+  if(!bid){toast('Select a bridge first','err');return}
+  var btn=$('reloadBridge');btn.disabled=true;
+  wsCall('homekit_architect/reload_bridge',{bridge_entry_id:bid})
+  .then(function(){toast('Bridge reloaded. The Home app will show updates shortly.','ok')})
+  .catch(function(e){toast(String(e),'err')})
+  .finally(function(){btn.disabled=false});
 });
 
 function renderPackages(){
@@ -381,7 +394,7 @@ $('mk').addEventListener('click',function(){
   var name=$('mn').value||'Accessory';
   var selected=ids();
 
-  function onOk(title){btn.disabled=false;btn.textContent='Create';cm();sel={};render();toast('Created "'+esc(title)+'"','ok')}
+  function onOk(title){btn.disabled=false;btn.textContent='Create';cm();sel={};render();toast('Created "'+esc(title)+'". HomeKit bridge is reloading — the accessory will appear in the Home app shortly.','ok')}
   function onErr(e){btn.disabled=false;btn.textContent='Create';toast(String(e),'err')}
 
   wsCall('homekit_architect/package_accessory',{
