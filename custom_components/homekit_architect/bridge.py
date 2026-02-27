@@ -56,19 +56,21 @@ async def async_apply_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None:
     if not template:
         return
 
-    platform = template["platform"]
-    virtual_entity_id = None
-    for _ in range(6):
-        virtual_entity_id = _get_virtual_entity_id(hass, entry, platform)
-        if virtual_entity_id:
-            break
-        await asyncio.sleep(1.0)
-    if not virtual_entity_id:
-        _LOGGER.warning(
-            "HomeKit Architect: virtual %s entity not found for entry %s; slot entities will be hidden but grouped entity may not appear in Home until HA is restarted",
-            platform,
-            entry.entry_id,
-        )
+    platforms = template.get("platforms") or [template["platform"]]
+    virtual_entity_ids: list[str] = []
+    for platform in platforms:
+        for _ in range(6):
+            eid = _get_virtual_entity_id(hass, entry, platform)
+            if eid:
+                virtual_entity_ids.append(eid)
+                break
+            await asyncio.sleep(1.0)
+        else:
+            _LOGGER.warning(
+                "HomeKit Architect: virtual %s entity not found for entry %s; slot entities will be hidden but grouped entity may not appear in Home until HA is restarted",
+                platform,
+                entry.entry_id,
+            )
     slot_entity_ids = get_slot_entity_ids(entry)
 
     options = deepcopy(dict(homekit_entry.options))
@@ -81,14 +83,15 @@ async def async_apply_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None:
             exclude.append(e)
     filt[CONF_EXCLUDE_ENTITIES] = sorted(set(exclude))
 
-    if virtual_entity_id:
+    if virtual_entity_ids:
         include = list(filt.get(CONF_INCLUDE_ENTITIES) or [])
-        if virtual_entity_id not in include:
-            include.append(virtual_entity_id)
+        for eid in virtual_entity_ids:
+            if eid not in include:
+                include.append(eid)
         filt[CONF_INCLUDE_ENTITIES] = sorted(set(include))
-        # Store so we can remove from bridge filter even after entity is gone (e.g. on integration remove)
+        # Store first for remove cleanup when entity is gone (e.g. on integration remove)
         arch_opts = dict(entry.options or {})
-        arch_opts[OPTION_GHOSTING_VIRTUAL_ENTITY_ID] = virtual_entity_id
+        arch_opts[OPTION_GHOSTING_VIRTUAL_ENTITY_ID] = virtual_entity_ids[0]
         hass.config_entries.async_update_entry(entry, options=arch_opts)
 
     options[CONF_FILTER] = filt
@@ -131,14 +134,17 @@ async def async_remove_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None
     if not template:
         return
 
-    platform = template["platform"]
-    # Prefer stored id so cleanup works after entity is already removed
+    platforms = template.get("platforms") or [template["platform"]]
     opts = entry.options or {}
-    virtual_entity_id = opts.get(OPTION_GHOSTING_VIRTUAL_ENTITY_ID) or _get_virtual_entity_id(
-        hass, entry, platform
-    )
+    virtual_entity_ids: set[str] = set()
+    if opts.get(OPTION_GHOSTING_VIRTUAL_ENTITY_ID):
+        virtual_entity_ids.add(opts[OPTION_GHOSTING_VIRTUAL_ENTITY_ID])
+    for platform in platforms:
+        eid = _get_virtual_entity_id(hass, entry, platform)
+        if eid:
+            virtual_entity_ids.add(eid)
     slot_entity_ids = get_slot_entity_ids(entry)
-    to_remove = set(slot_entity_ids) | ({virtual_entity_id} if virtual_entity_id else set())
+    to_remove = set(slot_entity_ids) | virtual_entity_ids
 
     options = deepcopy(dict(homekit_entry.options))
     filt = options.get(CONF_FILTER) or {}
