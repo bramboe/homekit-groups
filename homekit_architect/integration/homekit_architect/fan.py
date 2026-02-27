@@ -20,7 +20,7 @@ from .const import (
     TEMPLATES,
 )
 
-HANDLED_TEMPLATES = ("fan", "air_purifier", "fan_light")
+HANDLED_TEMPLATES = ("fan", "air_purifier", "fan_light", "multi_service")
 
 
 def _fan_switch_slot_key(template_id: str) -> str:
@@ -36,6 +36,12 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
+    if tid == "multi_service":
+        fan_slots = [k for k, eid in slots.items() if eid and domain_of(eid) == "fan"]
+        if not fan_slots:
+            return
+        async_add_entities([ArchitectFan(hass, entry, slot_key=sk) for sk in fan_slots])
+        return
     switch_key = _fan_switch_slot_key(tid)
     if not slots.get(switch_key):
         return
@@ -44,9 +50,15 @@ async def async_setup_entry(
 
 class ArchitectFan(ArchitectBase, FanEntity):
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        self._architect_init(hass, entry, "fan")
-        self._switch_slot_key = _fan_switch_slot_key(entry.data.get("template_id", ""))
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        slot_key: str | None = None,
+    ) -> None:
+        self._architect_init(hass, entry, "fan", slot_key=slot_key)
+        tid = entry.data.get("template_id", "")
+        self._switch_slot_key = slot_key if slot_key else _fan_switch_slot_key(tid)
         features = FanEntityFeature(0)
         if self._slot(SLOT_SPEED):
             features |= FanEntityFeature.SET_SPEED
