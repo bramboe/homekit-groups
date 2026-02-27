@@ -251,15 +251,24 @@ def _build_slots_from_mapping(
     slot_mapping: dict[str, str],
     entity_ids: list[str],
 ) -> dict[str, str]:
-    """Build slots dict from panel slot_mapping; suggest defaults from entity_ids for unmapped slots."""
+    """Build slots dict from panel slot_mapping.
+
+    IMPORTANT: This helper is intentionally permissive – it will happily reuse the
+    same underlying entity for multiple slots if needed. The goal is that as
+    long as the user selected at least one entity, ALL required slots will be
+    populated so creation cannot fail with \"missing slot\" errors.
+    """
     slots = dict(slot_mapping)
     required = set(template["required_slots"])
     optional = set(template.get("optional_slots") or [])
-    used = set(slots.values())
-    remaining = [e for e in entity_ids if e and e not in used]
+    all_ids = [e for e in entity_ids if e]
+
     for slot in required | optional:
-        if slot in slots and slots[slot]:
+        if slots.get(slot):
             continue
-        if remaining:
-            slots[slot] = remaining.pop(0)
+        if all_ids:
+            # Always fall back to the first selected entity; re‑using the same
+            # source entity for multiple slots is acceptable for our purposes.
+            slots[slot] = all_ids[0]
+
     return {k: v for k, v in slots.items() if v and k in required | optional}
