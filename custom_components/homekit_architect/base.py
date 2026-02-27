@@ -78,18 +78,23 @@ class ArchitectBase:
         hass: HomeAssistant,
         entry: ConfigEntry,
         platform: str,
+        slot_key: str | None = None,
     ) -> None:
         self.hass = hass
         self._entry = entry
         template_id = entry.data.get("template_id", "")
         self._template = TEMPLATES.get(template_id, {})
         self._slots: dict[str, str] = entry.data.get(CONF_SLOTS) or {}
+        self._multi_slot_key: str | None = slot_key
 
         friendly = (
             entry.data.get(CONF_ARCHITECT_ENTITY_FRIENDLY_NAME)
             or self._template.get("name", "Accessory")
         )
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{platform}"
+        if slot_key:
+            self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{platform}_{slot_key}"
+        else:
+            self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{platform}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": friendly,
