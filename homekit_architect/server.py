@@ -76,6 +76,7 @@ select:focus,input:focus{border-color:var(--pri)}
 </div>
 
 <div id="toast"></div>
+<div id="dbg" style="margin-top:32px;font-size:11px;color:#555;font-family:monospace"></div>
 
 <div class="mbg hide" id="mbg">
 <div class="mdl">
@@ -160,15 +161,24 @@ function getToken(){
   });
 }
 
+function handleResp(r){
+  if(r.ok) return r.json();
+  return r.text().then(function(body){
+    var detail=body;
+    try{var j=JSON.parse(body);detail=j.message||j.error||j.detail||body}catch(e){}
+    throw new Error(r.status+' '+r.statusText+': '+detail);
+  });
+}
+
 function haGet(path){
   return getToken().then(function(t){
     return fetch('/api'+path,{headers:{'Authorization':'Bearer '+t}});
-  }).then(function(r){if(!r.ok)throw new Error(r.status+': '+r.statusText);return r.json()});
+  }).then(handleResp);
 }
 function haPost(path,body){
   return getToken().then(function(t){
     return fetch('/api'+path,{method:'POST',headers:{'Authorization':'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(body)});
-  }).then(function(r){if(!r.ok)throw new Error(r.status+': '+r.statusText);return r.json()});
+  }).then(handleResp);
 }
 
 /* ── Helpers ──── */
@@ -390,6 +400,20 @@ function walkFlow(step,fd){
 function toast(t,c){$('toast').innerHTML='<div class="msg '+c+'">'+t+'</div>';setTimeout(function(){$('toast').innerHTML=''},6000)}
 
 /* ── Init ── */
+(function showDebug(){
+  var d=tokenData();
+  var lines=[];
+  lines.push('hassTokens: '+(d?'present':'MISSING'));
+  if(d){
+    lines.push('access_token: '+(d.access_token?d.access_token.substring(0,12)+'…':'NONE'));
+    lines.push('token_expires: '+(d.token_expires?new Date(d.token_expires).toISOString():'?'));
+    lines.push('expired: '+(d.token_expires?Date.now()>d.token_expires:'?'));
+    lines.push('refresh_token: '+(d.refresh_token?'present':'MISSING'));
+    lines.push('hassUrl: '+(d.hassUrl||'?'));
+  }
+  lines.push('location: '+location.origin+location.pathname);
+  $('dbg').textContent=lines.join(' | ');
+})();
 loadBridges();
 })();
 </script>
