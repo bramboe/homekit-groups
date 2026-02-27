@@ -136,11 +136,10 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
     def _slots_schema(self, template: dict) -> vol.Schema:
         schema = {}
         entity_sel = selector.EntitySelector(selector.EntitySelectorConfig(multiple=False))
-        for slot in template["required_slots"] + template["optional_slots"]:
-            if slot in template["required_slots"]:
-                schema[vol.Required(slot)] = entity_sel
-            else:
-                schema[vol.Optional(slot, default="")] = vol.Any("", entity_sel)
+        for slot in template["required_slots"]:
+            schema[vol.Required(slot)] = entity_sel
+        for slot in template["optional_slots"]:
+            schema[vol.Optional(slot, default="")] = str
         return vol.Schema(schema)
 
     async def async_step_bridge(
