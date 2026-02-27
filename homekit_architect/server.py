@@ -365,7 +365,8 @@ $('mk').addEventListener('click',function(){
   var btn=$('mk');btn.disabled=true;btn.textContent='Creating…';
   var atype=$('mt').value;
   var sm={};$('ms').querySelectorAll('select.sl').forEach(function(s){var k=s.getAttribute('data-s');if(k&&s.value)sm[k]=s.value});
-  var flowData={
+
+  var fullPayload={
     template_id:atype,
     slots:sm,
     homekit_bridge_entry_id:bid,
@@ -374,28 +375,18 @@ $('mk').addEventListener('click',function(){
   };
 
   haPost('/config/config_entries/flow',{handler:'homekit_architect',show_advanced_options:false})
-  .then(function(step){return walkFlow(step,flowData)})
+  .then(function(step){
+    if(!step||!step.flow_id) throw new Error('No flow_id returned');
+    return haPost('/config/config_entries/flow/'+step.flow_id, fullPayload);
+  })
   .then(function(result){
     btn.disabled=false;btn.textContent='Create';
-    if(result.type==='create_entry'){cm();sel={};render();toast('Created "'+esc(result.title||flowData.friendly_name)+'"','ok')}
-    else toast(result.reason||result.error||'Could not create accessory','err');
+    if(result.type==='create_entry'){cm();sel={};render();toast('Created "'+esc(result.title||fullPayload.friendly_name)+'"','ok')}
+    else if(result.type==='abort'){toast(result.reason||'Aborted','err')}
+    else toast(JSON.stringify(result),'err');
   })
   .catch(function(e){btn.disabled=false;btn.textContent='Create';toast(String(e),'err')});
 });
-
-function walkFlow(step,fd){
-  if(!step||!step.flow_id)return Promise.resolve({type:'abort',reason:'No flow_id'});
-  if(step.type==='create_entry'||step.type==='abort')return Promise.resolve(step);
-  if(step.type!=='form')return Promise.resolve({type:'abort',reason:'Unexpected: '+step.type});
-  var sid=step.step_id,fid=step.flow_id,body={};
-  if(sid==='user')body={template_id:fd.template_id};
-  else if(sid==='slots')body=fd.slots;
-  else if(sid==='bridge')body={homekit_bridge_entry_id:fd.homekit_bridge_entry_id};
-  else if(sid==='ghosting')body={automated_ghosting:fd.automated_ghosting,friendly_name:fd.friendly_name};
-  else if(sid==='panel')body=fd;
-  else return Promise.resolve({type:'abort',reason:'Unknown step: '+sid});
-  return haPost('/config/config_entries/flow/'+fid,body).then(function(next){return walkFlow(next,fd)});
-}
 
 function toast(t,c){$('toast').innerHTML='<div class="msg '+c+'">'+t+'</div>';setTimeout(function(){$('toast').innerHTML=''},6000)}
 
