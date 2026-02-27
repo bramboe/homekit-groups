@@ -56,15 +56,18 @@ async def async_apply_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None:
         return
 
     platform = template["platform"]
-    virtual_entity_id = _get_virtual_entity_id(hass, entry, platform)
+    virtual_entity_id = None
+    for _ in range(6):
+        virtual_entity_id = _get_virtual_entity_id(hass, entry, platform)
+        if virtual_entity_id:
+            break
+        await asyncio.sleep(1.0)
     if not virtual_entity_id:
-        _LOGGER.debug(
-            "HomeKit Architect: virtual %s entity not yet registered for entry %s",
+        _LOGGER.warning(
+            "HomeKit Architect: virtual %s entity not found for entry %s; slot entities will be hidden but grouped entity may not appear in Home until HA is restarted",
             platform,
             entry.entry_id,
         )
-        # Still apply exclusion of slots so raw entities are hidden
-        # User can re-save options to add include once entity exists
     slot_entity_ids = get_slot_entity_ids(entry)
 
     options = deepcopy(dict(homekit_entry.options))
@@ -86,7 +89,7 @@ async def async_apply_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None:
     options[CONF_FILTER] = filt
     hass.config_entries.async_update_entry(homekit_entry, options=options)
     # Delay reload so the bridge can release its port before restarting (avoids Errno 98)
-    await asyncio.sleep(2.5)
+    await asyncio.sleep(5.0)
     await hass.config_entries.async_reload(homekit_entry.entry_id)
     _LOGGER.info(
         "HomeKit Architect: applied ghosting for entry %s on bridge %s",
@@ -130,7 +133,7 @@ async def async_remove_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None
 
     options[CONF_FILTER] = filt
     hass.config_entries.async_update_entry(homekit_entry, options=options)
-    await asyncio.sleep(2.5)
+    await asyncio.sleep(5.0)
     await hass.config_entries.async_reload(homekit_entry.entry_id)
     _LOGGER.info(
         "HomeKit Architect: removed ghosting for entry %s from bridge %s",
