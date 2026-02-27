@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -22,7 +23,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
-    """Set up the HomeKit Entity Architect integration (WebSocket API only)."""
+    """Set up the HomeKit Entity Architect integration (WebSocket API only).
+
+    The UI is served exclusively by the add-on via ingress now, so we no
+    longer register a separate sidebar panel from the integration itself.
+    """
     async_register_websocket_handlers(hass)
     return True
 
@@ -49,6 +54,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if entry.data.get(CONF_AUTOMATED_GHOSTING) and entry.data.get(
         CONF_HOMEKIT_BRIDGE_ENTRY_ID
     ):
+        # Let the entity registry pick up the new virtual entity before applying ghosting
+        await asyncio.sleep(2.0)
         await async_apply_ghosting(hass, entry)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
