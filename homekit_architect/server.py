@@ -214,7 +214,7 @@ function esc(s){var d=document.createElement('div');d.textContent=s||'';return d
 
 /* ── Bridges ──── */
 function loadBridges(){
-  haGet('/config/config_entries/entry').then(function(entries){
+  return haGet('/config/config_entries/entry').then(function(entries){
     bridges=[];
     packages=[];
     entries.forEach(function(e){
@@ -369,19 +369,25 @@ $('mc').addEventListener('click',cm);$('mbg').addEventListener('click',function(
 function cm(){$('mbg').classList.add('hide')}
 
 /* ── WebSocket helper ── */
-function wsCall(type,data){
+function wsCall(type,data,opts){
+  opts=opts||{};
+  var timeoutMs=opts.timeoutMs||30000;
   return getToken().then(function(token){
     return new Promise(function(ok,fail){
       var proto=location.protocol==='https:'?'wss://':'ws://';
       var ws=new WebSocket(proto+location.host+'/api/websocket');
       var mid=1;
-      ws.onerror=function(){fail(new Error('WebSocket connection failed'))};
+      var resolved=false;
+      function finish(){if(resolved)return;resolved=true;clearTimeout(tid)}
+      var tid=setTimeout(function(){finish();ws.close();fail(new Error('Request timed out'))},timeoutMs);
+      ws.onerror=function(){finish();fail(new Error('WebSocket connection failed'))};
       ws.onmessage=function(evt){
-        var m=JSON.parse(evt.data);
+        var m;
+        try{m=JSON.parse(evt.data)}catch(e){return}
         if(m.type==='auth_required'){ws.send(JSON.stringify({type:'auth',access_token:token}))}
         else if(m.type==='auth_ok'){var p={id:mid,type:type};Object.keys(data||{}).forEach(function(k){p[k]=data[k]});ws.send(JSON.stringify(p))}
-        else if(m.type==='auth_invalid'){ws.close();fail(new Error('Auth invalid'))}
-        else if(m.type==='result'){ws.close();if(m.success)ok(m.result);else fail(new Error((m.error||{}).message||'WS error'))}
+        else if(m.type==='auth_invalid'){finish();ws.close();fail(new Error('Auth invalid'))}
+        else if(m.type==='result'&&(m.id===mid||m.id==mid)){finish();ws.close();if(m.success)ok(m.result);else fail(new Error((m.error||{}).message||'WS error'))}
       };
     });
   });
@@ -394,17 +400,26 @@ $('mk').addEventListener('click',function(){
   var name=$('mn').value||'Accessory';
   var selected=ids();
 
-  function onOk(title){btn.disabled=false;btn.textContent='Create';cm();sel={};render();toast('Created "'+esc(title)+'". HomeKit bridge is reloading — the accessory will appear in the Home app shortly.','ok')}
-  function onErr(e){btn.disabled=false;btn.textContent='Create';toast(String(e),'err')}
+  function done(){btn.disabled=false;btn.textContent='Create'}
 
   wsCall('homekit_architect/package_accessory',{
     bridge_entry_id:bid,display_name:name,accessory_type:atype,
     entity_ids:selected,slot_mapping:{},hide_sources:$('mg').checked
+  },{timeoutMs:25000})
+  .then(function(r){
+    done();cm();sel={};render();
+    var title=r.title||name;
+    loadBridges().then(function(){
+      if(bid){$('bsel').value=bid;$('reloadBridge').disabled=false;}
+      toast('Created "'+esc(title)+'". HomeKit bridge is reloading — the accessory will appear in the Home app shortly.','ok');
+    });
   })
-  .then(function(r){onOk(r.title||name)})
   .catch(function(wsErr){
-    btn.disabled=false;btn.textContent='Create';
-    showRestartBanner(String(wsErr));
+    done();cm();
+    var msg=String(wsErr);
+    if(msg.indexOf('timed out')!==-1)toast('Request timed out. The package may have been created — refresh the page to see it.','err');
+    else if(msg.indexOf('Auth')!==-1)showRestartBanner(msg);
+    else toast(msg,'err');
   });
 });
 
