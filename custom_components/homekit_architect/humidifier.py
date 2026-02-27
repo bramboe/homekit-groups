@@ -1,4 +1,7 @@
-"""Virtual humidifier platform for 'humidifier' and 'dehumidifier' templates."""
+"""Virtual humidifier platform for 'humidifier' and 'dehumidifier' templates.
+
+Template pattern: state from slot entity (any domain); commands by slot domain.
+turn_on/turn_off forward to slot; set_humidity when slot is humidifier/number."""
 
 from __future__ import annotations
 
