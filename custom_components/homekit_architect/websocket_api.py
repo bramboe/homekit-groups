@@ -21,6 +21,14 @@ from .const import (
     CONF_INCLUDE_ENTITIES,
     DOMAIN,
     MULTI_SERVICE_DOMAIN_TO_PLATFORM,
+    SLOT_OCTONARY,
+    SLOT_PRIMARY,
+    SLOT_QUATERNARY,
+    SLOT_QUINARY,
+    SLOT_SECONDARY,
+    SLOT_SENARY,
+    SLOT_SEPTENARY,
+    SLOT_TERTIARY,
     TEMPLATES,
 )
 
@@ -281,9 +289,40 @@ async def ws_reload_bridge(
     connection.send_result(msg["id"], {"reloaded": True})
 
 
+def _ensure_multi_service_template() -> None:
+    """Inject multi_service into TEMPLATES if missing (e.g. older integration install)."""
+    if "multi_service" in TEMPLATES or not MULTI_SERVICE_DOMAIN_TO_PLATFORM:
+        return
+    TEMPLATES["multi_service"] = {
+        "name": "Multi-Service",
+        "platforms": list(dict.fromkeys(MULTI_SERVICE_DOMAIN_TO_PLATFORM.values())),
+        "required_slots": [SLOT_PRIMARY, SLOT_SECONDARY],
+        "optional_slots": [
+            SLOT_TERTIARY,
+            SLOT_QUATERNARY,
+            SLOT_QUINARY,
+            SLOT_SENARY,
+            SLOT_SEPTENARY,
+            SLOT_OCTONARY,
+        ],
+        "slot_labels": {
+            SLOT_PRIMARY: "Control 1",
+            SLOT_SECONDARY: "Control 2",
+            SLOT_TERTIARY: "Control 3",
+            SLOT_QUATERNARY: "Control 4",
+            SLOT_QUINARY: "Control 5",
+            SLOT_SENARY: "Control 6",
+            SLOT_SEPTENARY: "Control 7",
+            SLOT_OCTONARY: "Control 8",
+        },
+    }
+
+
 def _accessory_type_to_template_id(accessory_type: str) -> str | None:
     """Validate that the accessory type is a known template."""
-    tid = (accessory_type or "").lower()
+    tid = (accessory_type or "").lower().strip().replace("-", "_")
+    if tid == "multi_service":
+        _ensure_multi_service_template()
     return tid if tid in TEMPLATES else None
 
 
