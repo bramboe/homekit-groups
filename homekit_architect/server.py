@@ -124,6 +124,7 @@ select:focus,input:focus{border-color:var(--pri)}
   </div>
   <div class="f"><label><input type="checkbox" id="mg" checked> Hide source entities from HomeKit</label></div>
   <div class="f" id="msel" style="font-size:12px;color:var(--dim)"></div>
+  <div class="f" id="mslots"><label style="display:block;margin-bottom:6px">Assign entities to slots</label><div id="mslotsinner"></div></div>
   <div class="acts"><button class="btn bs" id="mc">Cancel</button><button class="btn bp" id="mk">Create</button></div>
 </div>
 </div>
@@ -357,15 +358,58 @@ $('sa').addEventListener('change',function(){var c=this.checked;filt().forEach(f
 function upd(){var n=Object.keys(sel).filter(function(k){return sel[k]}).length;$('cnt').textContent=n?n+' selected':'';$('pkg').disabled=n===0}
 function ids(){return Object.keys(sel).filter(function(k){return sel[k]})}
 
+var templateList=[];
+
+function renderSlotAssignment(selectedIds,typeId){
+  var el=$('mslotsinner');
+  var t=templateList.find(function(x){return x.id===typeId});
+  if(!t||!selectedIds.length){el.innerHTML='';$('mslots').style.display='none';return}
+  var selectedEnts=selectedIds.map(function(id){return ents.find(function(e){return e.entity_id===id})}).filter(Boolean);
+  var firstId=selectedIds[0];
+  var h='';
+  function opt(eid,label){return '<option value="'+esc(eid)+'">'+esc(label||eid)+'</option>'}
+  t.required_slots.forEach(function(s){
+    h+='<div class="f" style="margin-bottom:6px"><label style="display:block;font-size:12px;color:var(--dim);margin-bottom:2px">'+esc(s.label)+'</label><select class="slotsel" data-slot-key="'+esc(s.key)+'" style="width:100%;padding:8px">';
+    selectedIds.forEach(function(eid){var e=ents.find(function(x){return x.entity_id===eid});h+=opt(eid,(e&&e.friendly_name)||eid)});
+    h+='</select></div>';
+  });
+  t.optional_slots.forEach(function(s){
+    h+='<div class="f" style="margin-bottom:6px"><label style="display:block;font-size:12px;color:var(--dim);margin-bottom:2px">'+esc(s.label)+'</label><select class="slotsel" data-slot-key="'+esc(s.key)+'" style="width:100%;padding:8px"><option value="">—</option>';
+    selectedIds.forEach(function(eid){var e=ents.find(function(x){return x.entity_id===eid});h+=opt(eid,(e&&e.friendly_name)||eid)});
+    h+='</select></div>';
+  });
+  el.innerHTML=h||'';
+  el.querySelectorAll('.slotsel').forEach(function(sel){
+    var key=sel.getAttribute('data-slot-key');
+    var isReq=t.required_slots.some(function(s){return s.key===key});
+    if(isReq&&firstId)sel.value=firstId;
+  });
+  $('mslots').style.display=h?'block':'none';
+}
+
+function getSlotMapping(){
+  var out={};
+  ($('mslotsinner').querySelectorAll('select[data-slot-key]')||[]).forEach(function(sel){
+    if(sel.value)out[sel.getAttribute('data-slot-key')]=sel.value;
+  });
+  return out;
+}
+
 /* ── Package modal ── */
+function ensureTemplatesThenRenderSlots(selectedIds,typeId){
+  if(templateList.length){renderSlotAssignment(selectedIds,typeId);return}
+  wsCall('homekit_architect/list_templates',{}).then(function(r){templateList=r.templates||[];renderSlotAssignment(selectedIds,typeId)}).catch(function(){renderSlotAssignment(selectedIds,typeId)});
+}
 $('pkg').addEventListener('click',function(){
   var i=ids();
   var det=detectType(i);
   $('mt').value=det;
   $('mn').value='';$('mg').checked=true;
   $('msel').textContent='Selected: '+i.join(', ');
+  ensureTemplatesThenRenderSlots(i,det);
   $('mbg').classList.remove('hide');
 });
+$('mt').addEventListener('change',function(){ensureTemplatesThenRenderSlots(ids(),this.value)});
 $('mc').addEventListener('click',cm);$('mbg').addEventListener('click',function(e){if(e.target===$('mbg'))cm()});
 function cm(){$('mbg').classList.add('hide')}
 
@@ -405,7 +449,7 @@ $('mk').addEventListener('click',function(){
 
   wsCall('homekit_architect/package_accessory',{
     bridge_entry_id:bid,display_name:name,accessory_type:atype,
-    entity_ids:selected,slot_mapping:{},hide_sources:$('mg').checked
+    entity_ids:selected,slot_mapping:getSlotMapping(),hide_sources:$('mg').checked
   },{timeoutMs:25000})
   .then(function(r){
     done();cm();sel={};render();
@@ -458,6 +502,7 @@ function toast(t,c){$('toast').innerHTML='<div class="msg '+c+'">'+t+'</div>';se
   $('dbg').textContent=lines.join(' | ');
 })();
 loadBridges();
+getToken().then(function(){return wsCall('homekit_architect/list_templates',{});}).then(function(r){if(r&&r.templates)templateList=r.templates;}).catch(function(){});
 })();
 </script>
 </body>
