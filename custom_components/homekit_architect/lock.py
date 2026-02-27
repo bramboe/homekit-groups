@@ -1,4 +1,7 @@
-"""Virtual lock platform for the 'lock' template."""
+"""Virtual lock platform for the 'lock' template.
+
+Template pattern: state from slot entity; lock/unlock forwarded by domain
+(lock.lock/unlock or switch/light turn_off/turn_on for single-entity lock)."""
 
 from __future__ import annotations
 
