@@ -380,26 +380,48 @@ function wsCall(type,data){
   });
 }
 
-/* ── Create accessory via WebSocket ── */
+/* ── REST config flow fallback (walks steps one by one) ── */
+function restCreate(fd){
+  return haPost('/config/config_entries/flow',{handler:'homekit_architect',show_advanced_options:false})
+  .then(function(step){return walkFlow(step,fd)});
+}
+function walkFlow(step,fd){
+  if(!step||!step.flow_id)return Promise.resolve({type:'abort',reason:'No flow_id'});
+  if(step.type==='create_entry'||step.type==='abort')return Promise.resolve(step);
+  if(step.type!=='form')return Promise.resolve({type:'abort',reason:'Unexpected: '+step.type});
+  var sid=step.step_id,fid=step.flow_id,body={};
+  if(sid==='user') body={template_id:fd.template_id};
+  else if(sid==='slots'){body={};var all=fd.slots||{};Object.keys(all).forEach(function(k){if(all[k])body[k]=all[k]})}
+  else if(sid==='bridge') body={homekit_bridge_entry_id:fd.homekit_bridge_entry_id};
+  else if(sid==='ghosting') body={automated_ghosting:fd.automated_ghosting,friendly_name:fd.friendly_name};
+  else return Promise.resolve({type:'abort',reason:'Unknown step: '+sid});
+  return haPost('/config/config_entries/flow/'+fid,body).then(function(next){return walkFlow(next,fd)});
+}
+
+/* ── Create accessory: try WebSocket, fall back to REST ── */
 $('mk').addEventListener('click',function(){
   var btn=$('mk');btn.disabled=true;btn.textContent='Creating…';
   var atype=$('mt').value;
   var sm={};$('ms').querySelectorAll('select.sl').forEach(function(s){var k=s.getAttribute('data-s');if(k&&s.value)sm[k]=s.value});
+  var name=$('mn').value||'Accessory';
+
+  function onOk(title){btn.disabled=false;btn.textContent='Create';cm();sel={};render();toast('Created "'+esc(title)+'"','ok')}
+  function onErr(e){btn.disabled=false;btn.textContent='Create';toast(String(e),'err')}
 
   wsCall('homekit_architect/package_accessory',{
-    bridge_entry_id:bid,
-    display_name:$('mn').value||'Accessory',
-    accessory_type:atype,
-    entity_ids:ids(),
-    slot_mapping:sm,
-    hide_sources:$('mg').checked
+    bridge_entry_id:bid,display_name:name,accessory_type:atype,
+    entity_ids:ids(),slot_mapping:sm,hide_sources:$('mg').checked
   })
-  .then(function(result){
-    btn.disabled=false;btn.textContent='Create';
-    cm();sel={};render();
-    toast('Created "'+esc(result.title||$('mn').value||'Accessory')+'"','ok');
-  })
-  .catch(function(e){btn.disabled=false;btn.textContent='Create';toast(String(e),'err')});
+  .then(function(r){onOk(r.title||name)})
+  .catch(function(){
+    restCreate({template_id:atype,slots:sm,homekit_bridge_entry_id:bid,
+      automated_ghosting:$('mg').checked,friendly_name:name})
+    .then(function(r){
+      if(r.type==='create_entry') onOk(r.title||name);
+      else onErr(r.reason||'Could not create accessory');
+    })
+    .catch(onErr);
+  });
 });
 
 function toast(t,c){$('toast').innerHTML='<div class="msg '+c+'">'+t+'</div>';setTimeout(function(){$('toast').innerHTML=''},6000)}
