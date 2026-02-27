@@ -360,30 +360,44 @@ function suggest(t,i){
   });
 }
 
-/* ── Create accessory via config flow ── */
+/* ── WebSocket helper ── */
+function wsCall(type,data){
+  return getToken().then(function(token){
+    return new Promise(function(ok,fail){
+      var proto=location.protocol==='https:'?'wss://':'ws://';
+      var ws=new WebSocket(proto+location.host+'/api/websocket');
+      var mid=1;
+      ws.onopen=function(){};
+      ws.onerror=function(){fail(new Error('WebSocket connection failed'))};
+      ws.onmessage=function(evt){
+        var m=JSON.parse(evt.data);
+        if(m.type==='auth_required'){ws.send(JSON.stringify({type:'auth',access_token:token}))}
+        else if(m.type==='auth_ok'){var p={id:mid,type:type};Object.keys(data||{}).forEach(function(k){p[k]=data[k]});ws.send(JSON.stringify(p))}
+        else if(m.type==='auth_invalid'){ws.close();fail(new Error('Auth invalid'))}
+        else if(m.type==='result'){ws.close();if(m.success)ok(m.result);else fail(new Error((m.error||{}).message||'WS error'))}
+      };
+    });
+  });
+}
+
+/* ── Create accessory via WebSocket ── */
 $('mk').addEventListener('click',function(){
   var btn=$('mk');btn.disabled=true;btn.textContent='Creating…';
   var atype=$('mt').value;
   var sm={};$('ms').querySelectorAll('select.sl').forEach(function(s){var k=s.getAttribute('data-s');if(k&&s.value)sm[k]=s.value});
 
-  var fullPayload={
-    template_id:atype,
-    slots:sm,
-    homekit_bridge_entry_id:bid,
-    automated_ghosting:$('mg').checked,
-    friendly_name:$('mn').value||'Accessory'
-  };
-
-  haPost('/config/config_entries/flow',{handler:'homekit_architect',show_advanced_options:false})
-  .then(function(step){
-    if(!step||!step.flow_id) throw new Error('No flow_id returned');
-    return haPost('/config/config_entries/flow/'+step.flow_id, fullPayload);
+  wsCall('homekit_architect/package_accessory',{
+    bridge_entry_id:bid,
+    display_name:$('mn').value||'Accessory',
+    accessory_type:atype,
+    entity_ids:ids(),
+    slot_mapping:sm,
+    hide_sources:$('mg').checked
   })
   .then(function(result){
     btn.disabled=false;btn.textContent='Create';
-    if(result.type==='create_entry'){cm();sel={};render();toast('Created "'+esc(result.title||fullPayload.friendly_name)+'"','ok')}
-    else if(result.type==='abort'){toast(result.reason||'Aborted','err')}
-    else toast(JSON.stringify(result),'err');
+    cm();sel={};render();
+    toast('Created "'+esc(result.title||$('mn').value||'Accessory')+'"','ok');
   })
   .catch(function(e){btn.disabled=false;btn.textContent='Create';toast(String(e),'err')});
 });
