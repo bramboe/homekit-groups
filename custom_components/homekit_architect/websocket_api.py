@@ -153,14 +153,35 @@ async def ws_package_accessory(
         connection.send_error(msg["id"], "invalid_template", "Template not found")
         return
 
-    # Build slots from slot_mapping; ensure required slots are filled from entity_ids if not mapped
+    # Build slots from slot_mapping; ensure required slots are filled from entity_ids if not mapped.
+    # If some required slots are still missing (because the user picked an advanced type but did not
+    # provide matching entities), gracefully fall back to a simple \"switch\"-style template that only
+    # needs a single source entity.
     slots = _build_slots_from_mapping(template, slot_mapping, entity_ids)
-    for req in template["required_slots"]:
-        if not slots.get(req):
+    missing_required = [req for req in template["required_slots"] if not slots.get(req)]
+
+    if missing_required:
+        # Try to pick a simpler template based on the selected entities, but at minimum
+        # use a plain \"switch\" template which only requires one entity.
+        fallback_template_id = _pick_fallback_template_id(entity_ids)
+        if fallback_template_id and fallback_template_id in TEMPLATES:
+            template_id = fallback_template_id
+            template = TEMPLATES[template_id]
+            slots = _build_slots_from_mapping(template, {}, entity_ids)
+            # After fallback, if we STILL can't satisfy required slots, abort.
+            missing_required = [req for req in template["required_slots"] if not slots.get(req)]
+            if missing_required:
+                connection.send_error(
+                    msg["id"],
+                    "missing_slot",
+                    f"Required slot(s) {', '.join(missing_required)} must be assigned to an entity.",
+                )
+                return
+        else:
             connection.send_error(
                 msg["id"],
                 "missing_slot",
-                f"Required slot '{req}' must be assigned to an entity.",
+                f"Required slot(s) {', '.join(missing_required)} must be assigned to an entity.",
             )
             return
 
@@ -199,8 +220,29 @@ async def ws_package_accessory(
 def _accessory_type_to_template_id(accessory_type: str) -> str | None:
     """Validate that the accessory type is a known template."""
     tid = (accessory_type or "").lower()
-    if tid in TEMPLATES:
-        return tid
+    return tid if tid in TEMPLATES else None
+
+
+def _pick_fallback_template_id(entity_ids: list[str]) -> str | None:
+    """Pick a simple template id that we can always satisfy from the selected entities."""
+    if not entity_ids:
+        return None
+
+    domains = [eid.split(".", 1)[0] for eid in entity_ids if "." in eid]
+
+    # Prefer a light-style template if there is any light entity
+    if "light" in domains and "lightbulb" in TEMPLATES:
+        return "lightbulb"
+    # Prefer a lock template if there is a lock
+    if "lock" in domains and "lock" in TEMPLATES:
+        return "lock"
+    # Prefer a fan template if there is a fan
+    if "fan" in domains and "fan" in TEMPLATES:
+        return "fan"
+
+    # Default fallback is a simple switch-style template – works for almost anything
+    if "switch" in TEMPLATES:
+        return "switch"
     return None
 
 
