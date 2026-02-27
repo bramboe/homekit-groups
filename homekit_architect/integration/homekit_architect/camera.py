@@ -8,10 +8,10 @@ from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .base import ArchitectBase
+from .base import ArchitectBase, domain_of
 from .const import SLOT_CAMERA, SLOT_MOTION
 
-HANDLED_TEMPLATES = ("camera",)
+HANDLED_TEMPLATES = ("camera", "multi_service")
 
 
 async def async_setup_entry(
@@ -21,6 +21,12 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
+    if tid == "multi_service":
+        camera_slots = [k for k, eid in slots.items() if eid and domain_of(eid) == "camera"]
+        if not camera_slots:
+            return
+        async_add_entities([ArchitectCamera(hass, entry, slot_key=sk) for sk in camera_slots])
+        return
     if not slots.get(SLOT_CAMERA):
         return
     async_add_entities([ArchitectCamera(hass, entry)])
@@ -28,13 +34,19 @@ async def async_setup_entry(
 
 class ArchitectCamera(ArchitectBase, Camera):
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        slot_key: str | None = None,
+    ) -> None:
         Camera.__init__(self)
-        self._architect_init(hass, entry, "camera")
+        self._architect_init(hass, entry, "camera", slot_key=slot_key)
+        self._camera_slot = slot_key if slot_key else SLOT_CAMERA
 
     @callback
     def _update_state(self) -> None:
-        src = self._slot(SLOT_CAMERA)
+        src = self._slot(self._camera_slot)
         st = self.hass.states.get(src) if src else None
         if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             self._attr_is_streaming = st.state == "streaming"
@@ -43,7 +55,7 @@ class ArchitectCamera(ArchitectBase, Camera):
             self._attr_is_on = False
 
         attrs: dict = {}
-        mot = self._slot(SLOT_MOTION)
+        mot = self._slot(SLOT_MOTION) if not self._multi_slot_key else None
         if mot:
             ms = self.hass.states.get(mot)
             if ms:
@@ -52,13 +64,13 @@ class ArchitectCamera(ArchitectBase, Camera):
 
     async def async_added_to_hass(self) -> None:
         self._update_state()
-        await self._async_track_slots(SLOT_CAMERA, SLOT_MOTION)
+        await self._async_track_slots(self._camera_slot, SLOT_MOTION)
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
         """Forward image request to the source camera."""
-        src = self._slot(SLOT_CAMERA)
+        src = self._slot(self._camera_slot)
         if not src:
             return None
         cam = self.hass.states.get(src)
