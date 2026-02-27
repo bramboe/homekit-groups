@@ -18,7 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .base import ArchitectBase, domain_of
 from .const import SLOT_BRIGHTNESS, SLOT_COLOR, SLOT_SWITCH, TEMPLATES
 
-HANDLED_TEMPLATES = ("lightbulb", "fan_light")
+HANDLED_TEMPLATES = ("lightbulb", "fan_light", "multi_service")
 
 
 def _light_switch_slot_key(template_id: str) -> str:
@@ -34,6 +34,12 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
+    if tid == "multi_service":
+        light_slots = [k for k, eid in slots.items() if eid and domain_of(eid) == "light"]
+        if not light_slots:
+            return
+        async_add_entities([ArchitectLight(hass, entry, slot_key=sk) for sk in light_slots])
+        return
     switch_key = _light_switch_slot_key(tid)
     if not slots.get(switch_key):
         return
@@ -42,9 +48,15 @@ async def async_setup_entry(
 
 class ArchitectLight(ArchitectBase, LightEntity):
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        self._architect_init(hass, entry, "light")
-        self._switch_slot_key = _light_switch_slot_key(entry.data.get("template_id", ""))
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        slot_key: str | None = None,
+    ) -> None:
+        self._architect_init(hass, entry, "light", slot_key=slot_key)
+        tid = entry.data.get("template_id", "")
+        self._switch_slot_key = slot_key if slot_key else _light_switch_slot_key(tid)
         modes: set[ColorMode] = set()
         if self._slot(SLOT_COLOR):
             modes.add(ColorMode.HS)
