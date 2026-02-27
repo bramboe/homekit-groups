@@ -11,6 +11,9 @@ CONF_HOMEKIT_BRIDGE_ENTRY_ID = "homekit_bridge_entry_id"
 CONF_AUTOMATED_GHOSTING = "automated_ghosting"
 CONF_ARCHITECT_ENTITY_FRIENDLY_NAME = "friendly_name"
 
+# Stored in Architect entry options for cleanup when entity may already be gone
+OPTION_GHOSTING_VIRTUAL_ENTITY_ID = "_ghosting_virtual_entity_id"
+
 # HomeKit bridge filter keys
 CONF_FILTER = "filter"
 CONF_INCLUDE_ENTITIES = "include_entities"
