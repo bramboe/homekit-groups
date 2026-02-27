@@ -51,7 +51,8 @@ async def ws_list_bridges(
     """Return active HomeKit bridges with their current filter (include/exclude)."""
     bridges = []
     for entry in hass.config_entries.async_entries(HOMEKIT_DOMAIN):
-        if entry.options.get("homekit_mode") != HOMEKIT_MODE_BRIDGE:
+        mode = entry.options.get("homekit_mode") or entry.data.get("homekit_mode", "bridge")
+        if mode == "accessory":
             continue
         filt = entry.options.get(CONF_FILTER) or {}
         bridges.append(
@@ -196,16 +197,10 @@ async def ws_package_accessory(
 
 
 def _accessory_type_to_template_id(accessory_type: str) -> str | None:
-    """Map UI accessory type (fan, lock, cover, light) to our template_id."""
-    at = (accessory_type or "").lower()
-    if at in ("lock", "security", "smart_lock"):
-        return "security_lock"
-    if at in ("cover", "garage_door", "garage"):
-        return "garage_door"
-    if at in ("fan", "ventilation") and "fan" in TEMPLATES:
-        return "fan"
-    if at in ("light", "switch") and "light" in TEMPLATES:
-        return "light"
+    """Validate that the accessory type is a known template."""
+    tid = (accessory_type or "").lower()
+    if tid in TEMPLATES:
+        return tid
     return None
 
 
