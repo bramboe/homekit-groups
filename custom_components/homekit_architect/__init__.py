@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
-from homeassistant.components import frontend
-from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -25,31 +22,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
-    """Set up the HomeKit Entity Architect integration (panel + WebSocket API)."""
-    async_register_websocket_handlers(hass)
+    """Set up the HomeKit Entity Architect integration (WebSocket API only).
 
-    # Serve panel static files and register the config panel
-    frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
-    if os.path.isdir(frontend_path):
-        await hass.http.async_register_static_paths(
-            [StaticPathConfig(f"/{DOMAIN}_panel", frontend_path, False)]
-        )
-        panel_url = f"/{DOMAIN}_panel/homekit-architect.js"
-        await frontend.async_register_built_in_panel(
-            hass,
-            component_name="custom",
-            sidebar_title="HomeKit Architect",
-            sidebar_icon="mdi:apple-homekit",
-            frontend_url_path="homekit-architect",
-            config={
-                "_panel_custom": {
-                    "name": "homekit-architect-panel",
-                    "module_url": panel_url,
-                    "js_url": panel_url,
-                },
-            },
-            require_admin=True,
-        )
+    The UI is served exclusively by the add-on via ingress now, so we no
+    longer register a separate sidebar panel from the integration itself.
+    """
+    async_register_websocket_handlers(hass)
     return True
 
 
