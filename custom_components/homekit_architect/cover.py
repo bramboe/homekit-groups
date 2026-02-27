@@ -1,4 +1,7 @@
-"""Virtual cover platform for garage_door, door, window, window_covering."""
+"""Virtual cover platform for garage_door, door, window, window_covering.
+
+Template pattern: state from slot entity; open/close forwarded by domain
+(cover.open_cover/close_cover or switch turn_on/turn_off)."""
 
 from __future__ import annotations
 
