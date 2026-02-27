@@ -8,17 +8,19 @@ from copy import deepcopy
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
 
 from .const import (
+    CONF_EXCLUDE_ENTITIES,
     CONF_FILTER,
     CONF_HOMEKIT_BRIDGE_ENTRY_ID,
-    CONF_EXCLUDE_ENTITIES,
     CONF_INCLUDE_ENTITIES,
     CONF_SLOTS,
     DOMAIN,
+    OPTION_GHOSTING_VIRTUAL_ENTITY_ID,
+    OPTION_GHOSTING_VIRTUAL_ENTITY_IDS,
     TEMPLATES,
 )
+from . import get_all_virtual_entity_ids
 
 
 def get_slot_entity_ids(entry: ConfigEntry) -> list[str]:
@@ -55,21 +57,17 @@ async def async_apply_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None:
     if not template:
         return
 
-    platforms = template.get("platforms") or [template["platform"]]
     virtual_entity_ids: list[str] = []
-    for platform in platforms:
-        for _ in range(6):
-            eid = _get_virtual_entity_id(hass, entry, platform)
-            if eid:
-                virtual_entity_ids.append(eid)
-                break
-            await asyncio.sleep(1.0)
-        else:
-            _LOGGER.warning(
-                "HomeKit Architect: virtual %s entity not found for entry %s; slot entities will be hidden but grouped entity may not appear in Home until HA is restarted",
-                platform,
-                entry.entry_id,
-            )
+    for _ in range(6):
+        virtual_entity_ids = get_all_virtual_entity_ids(hass, entry)
+        if virtual_entity_ids:
+            break
+        await asyncio.sleep(1.0)
+    if not virtual_entity_ids:
+        _LOGGER.warning(
+            "HomeKit Architect: no virtual entities found for entry %s; slot entities will be hidden but grouped entity may not appear in Home until HA is restarted",
+            entry.entry_id,
+        )
     slot_entity_ids = get_slot_entity_ids(entry)
 
     options = deepcopy(dict(homekit_entry.options))
@@ -88,6 +86,10 @@ async def async_apply_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None:
             if eid not in include:
                 include.append(eid)
         filt[CONF_INCLUDE_ENTITIES] = sorted(set(include))
+        arch_opts = dict(entry.options or {})
+        arch_opts[OPTION_GHOSTING_VIRTUAL_ENTITY_ID] = virtual_entity_ids[0]
+        arch_opts[OPTION_GHOSTING_VIRTUAL_ENTITY_IDS] = virtual_entity_ids
+        hass.config_entries.async_update_entry(entry, options=arch_opts)
 
     options[CONF_FILTER] = filt
     hass.config_entries.async_update_entry(homekit_entry, options=options)
@@ -119,12 +121,15 @@ async def async_remove_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None
     if not template:
         return
 
-    platforms = template.get("platforms") or [template["platform"]]
-    virtual_entity_ids = set()
-    for platform in platforms:
-        eid = _get_virtual_entity_id(hass, entry, platform)
-        if eid:
-            virtual_entity_ids.add(eid)
+    opts = entry.options or {}
+    virtual_entity_ids: set[str] = set()
+    stored_ids = opts.get(OPTION_GHOSTING_VIRTUAL_ENTITY_IDS)
+    if isinstance(stored_ids, list):
+        virtual_entity_ids.update(stored_ids)
+    elif opts.get(OPTION_GHOSTING_VIRTUAL_ENTITY_ID):
+        virtual_entity_ids.add(opts[OPTION_GHOSTING_VIRTUAL_ENTITY_ID])
+    if not virtual_entity_ids:
+        virtual_entity_ids.update(get_all_virtual_entity_ids(hass, entry))
     slot_entity_ids = get_slot_entity_ids(entry)
     to_remove = set(slot_entity_ids) | virtual_entity_ids
 
@@ -138,6 +143,11 @@ async def async_remove_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None
     include = [e for e in (filt.get(CONF_INCLUDE_ENTITIES) or []) if e not in to_remove]
     filt[CONF_INCLUDE_ENTITIES] = include
 
+    keys_to_remove = (OPTION_GHOSTING_VIRTUAL_ENTITY_ID, OPTION_GHOSTING_VIRTUAL_ENTITY_IDS)
+    arch_opts = {k: v for k, v in (entry.options or {}).items() if k not in keys_to_remove}
+    if arch_opts != dict(entry.options or {}):
+        hass.config_entries.async_update_entry(entry, options=arch_opts)
+
     options[CONF_FILTER] = filt
     hass.config_entries.async_update_entry(homekit_entry, options=options)
     await asyncio.sleep(5.0)
@@ -147,10 +157,3 @@ async def async_remove_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None
         entry.title,
         homekit_entry.title,
     )
-
-
-def _get_virtual_entity_id(hass: HomeAssistant, entry: ConfigEntry, platform: str) -> str | None:
-    """Resolve virtual entity_id from entity registry."""
-    reg = er.async_get(hass)
-    unique_id = f"{DOMAIN}_{entry.entry_id}_{platform}"
-    return reg.async_get_entity_id(platform, DOMAIN, unique_id)
