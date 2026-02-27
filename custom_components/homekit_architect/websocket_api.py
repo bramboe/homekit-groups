@@ -35,6 +35,7 @@ def async_register_websocket_handlers(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_list_bridges)
     websocket_api.async_register_command(hass, ws_bridge_entities)
     websocket_api.async_register_command(hass, ws_package_accessory)
+    websocket_api.async_register_command(hass, ws_reload_bridge)
 
 
 @websocket_api.websocket_command(
@@ -215,6 +216,35 @@ async def ws_package_accessory(
             "title": entry.title,
         },
     )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/reload_bridge",
+        vol.Required("bridge_entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_reload_bridge(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Reload a HomeKit bridge so it picks up new or changed accessories."""
+    bridge_entry_id = (msg["bridge_entry_id"] or "").strip()
+    if not bridge_entry_id:
+        connection.send_error(msg["id"], "invalid_input", "bridge_entry_id is required")
+        return
+    entry = hass.config_entries.async_get_entry(bridge_entry_id)
+    if not entry or entry.domain != HOMEKIT_DOMAIN:
+        connection.send_error(msg["id"], "bridge_not_found", "HomeKit bridge not found")
+        return
+    mode = entry.options.get("homekit_mode") or entry.data.get("homekit_mode", "bridge")
+    if mode == "accessory":
+        connection.send_error(msg["id"], "invalid_bridge", "Entry is an accessory, not a bridge")
+        return
+    await hass.config_entries.async_reload(bridge_entry_id)
+    connection.send_result(msg["id"], {"reloaded": True})
 
 
 def _accessory_type_to_template_id(accessory_type: str) -> str | None:
