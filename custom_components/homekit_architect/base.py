@@ -1,9 +1,18 @@
-"""Shared base for all Architect virtual entities."""
+"""Shared base for all Architect virtual entities.
+
+Design (template pattern): Each virtual entity derives its state from the slot
+entity/entities and forwards commands using the slot entity's domain. Any source
+entity type can back a virtual type with appropriate mapping (e.g. a light can
+drive a virtual fan; a switch can drive a virtual light or fan). Platforms
+implement domain-specific state and command mapping where needed.
+"""
 
 from __future__ import annotations
 
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
+    STATE_OFF,
+    STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
@@ -19,10 +28,44 @@ from .const import (
     TEMPLATES,
 )
 
+__all__ = ("ArchitectBase", "domain_of", "slot_entity_is_on")
+
 
 def domain_of(entity_id: str) -> str:
     """Extract domain from entity_id."""
     return entity_id.split(".", 1)[0] if "." in entity_id else ""
+
+
+def slot_entity_is_on(hass: HomeAssistant, entity_id: str) -> bool | None:
+    """Return True/False if the entity is on/off; None if unavailable.
+    Works for any domain: switch, light, fan, climate (heat/cool/auto = on), etc.
+    """
+    st = hass.states.get(entity_id) if entity_id else None
+    if not st or st.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        return None
+    s = st.state.lower()
+    if s == STATE_ON:
+        return True
+    if s == STATE_OFF:
+        return False
+    # climate: heat, cool, auto, heat_cool = on
+    if s in ("heat", "cool", "auto", "heat_cool"):
+        return True
+    # media_player: playing, paused, idle = on
+    if s in ("playing", "paused", "idle", "buffering"):
+        return True
+    # lock: unlocked = "on" for grouping purposes
+    if s == "unlocked":
+        return True
+    if s == "locked":
+        return False
+    # alarm: armed = on
+    if s in ("armed_home", "armed_away", "armed_night", "armed_vacation", "triggered"):
+        return True
+    if s == "disarmed":
+        return False
+    # default: treat as "on" if not off
+    return s != "off"
 
 
 class ArchitectBase:
