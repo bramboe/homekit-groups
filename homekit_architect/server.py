@@ -81,7 +81,47 @@ select:focus,input:focus{border-color:var(--pri)}
 <div class="mdl">
   <h2>Package as Accessory</h2>
   <div class="f"><label>Display name</label><input type="text" id="mn" placeholder="e.g. Ventilation Fan"></div>
-  <div class="f"><label>Accessory type</label><select id="mt"><option value="lock">Smart Lock</option><option value="cover">Garage Door</option></select></div>
+  <div class="f"><label>Accessory type</label><select id="mt">
+    <optgroup label="Security &amp; Access">
+      <option value="lock">Door Lock</option>
+      <option value="security_system">Security System</option>
+      <option value="doorbell">Video Doorbell</option>
+    </optgroup>
+    <optgroup label="Doors, Gates &amp; Covers">
+      <option value="garage_door">Garage Door</option>
+      <option value="door">Door</option>
+      <option value="window">Window</option>
+      <option value="window_covering">Window Covering</option>
+    </optgroup>
+    <optgroup label="Lighting &amp; Power">
+      <option value="lightbulb">Light</option>
+      <option value="outlet">Outlet</option>
+      <option value="switch">Switch</option>
+    </optgroup>
+    <optgroup label="Climate &amp; Environment">
+      <option value="thermostat">Thermostat</option>
+      <option value="fan">Fan</option>
+      <option value="air_purifier">Air Purifier</option>
+      <option value="humidifier">Humidifier</option>
+      <option value="dehumidifier">Dehumidifier</option>
+    </optgroup>
+    <optgroup label="Water">
+      <option value="sprinkler">Sprinkler</option>
+      <option value="faucet">Faucet</option>
+      <option value="shower">Shower Head</option>
+    </optgroup>
+    <optgroup label="Media">
+      <option value="television">Television</option>
+      <option value="speaker">Speaker</option>
+    </optgroup>
+    <optgroup label="Sensors">
+      <option value="sensor">Sensor</option>
+    </optgroup>
+    <optgroup label="Other">
+      <option value="camera">IP Camera</option>
+      <option value="programmable_switch">Programmable Switch</option>
+    </optgroup>
+  </select></div>
   <div class="f"><label><input type="checkbox" id="mg" checked> Hide source entities from HomeKit</label></div>
   <div class="f" id="ms"></div>
   <div class="acts"><button class="btn bs" id="mc">Cancel</button><button class="btn bp" id="mk">Create</button></div>
@@ -134,10 +174,30 @@ function haPost(path,body){
 /* ── Helpers ──── */
 var bridges=[],bid='',ents=[],sel={},q='',df={};
 var SLOTS={
-  security_lock:{action_slot:'Lock actuator',state_slot:'State sensor',battery_slot:'Battery (optional)',obstruction_slot:'Obstruction (optional)'},
-  garage_door:{actuator_slot:'Open/Close actuator',position_sensor_slot:'Position sensor',battery_slot:'Battery (optional)'}
+  lock:          {action_slot:'Lock actuator',state_slot:'State sensor',battery_slot:'Battery (optional)',obstruction_slot:'Obstruction (optional)'},
+  security_system:{arm_slot:'Arm/Disarm control',state_slot:'State sensor',battery_slot:'Battery (optional)'},
+  doorbell:      {trigger_slot:'Doorbell trigger',camera_slot:'Camera stream (optional)',battery_slot:'Battery (optional)'},
+  garage_door:   {actuator_slot:'Open/Close actuator',position_sensor_slot:'Position sensor',obstruction_slot:'Obstruction (optional)',battery_slot:'Battery (optional)'},
+  door:          {actuator_slot:'Open/Close actuator',position_sensor_slot:'Position sensor',battery_slot:'Battery (optional)'},
+  window:        {actuator_slot:'Open/Close actuator',position_sensor_slot:'Position sensor',battery_slot:'Battery (optional)'},
+  window_covering:{position_slot:'Position control',tilt_slot:'Tilt control (optional)',battery_slot:'Battery (optional)'},
+  lightbulb:     {switch_slot:'On/Off control',brightness_slot:'Brightness (optional)',color_slot:'Color (optional)'},
+  outlet:        {switch_slot:'On/Off control',power_sensor_slot:'Power sensor (optional)'},
+  switch:        {switch_slot:'On/Off control',state_slot:'State sensor (optional)'},
+  thermostat:    {climate_slot:'Climate entity',temperature_sensor_slot:'Temperature sensor (optional)',humidity_sensor_slot:'Humidity sensor (optional)'},
+  fan:           {switch_slot:'On/Off control',speed_slot:'Speed control (optional)',battery_slot:'Battery (optional)'},
+  air_purifier:  {switch_slot:'On/Off control',air_quality_slot:'Air quality sensor (optional)',filter_slot:'Filter life (optional)'},
+  humidifier:    {switch_slot:'On/Off control',humidity_sensor_slot:'Humidity sensor (optional)',target_slot:'Target humidity (optional)'},
+  dehumidifier:  {switch_slot:'On/Off control',humidity_sensor_slot:'Humidity sensor (optional)',target_slot:'Target humidity (optional)'},
+  sprinkler:     {switch_slot:'On/Off control',timer_slot:'Timer/Duration (optional)'},
+  faucet:        {switch_slot:'On/Off control'},
+  shower:        {switch_slot:'On/Off control'},
+  television:    {media_slot:'Media player entity',power_slot:'Power control (optional)'},
+  speaker:       {media_slot:'Media player entity',volume_slot:'Volume control (optional)'},
+  sensor:        {primary_slot:'Primary sensor',secondary_slot:'Secondary sensor (optional)',battery_slot:'Battery (optional)'},
+  camera:        {camera_slot:'Camera entity',motion_slot:'Motion sensor (optional)'},
+  programmable_switch:{trigger_slot:'Trigger entity',battery_slot:'Battery (optional)'}
 };
-var TM={lock:'security_lock',cover:'garage_door'};
 
 function $(i){return document.getElementById(i)}
 function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
@@ -238,9 +298,11 @@ $('mt').addEventListener('change',rslots);
 function cm(){$('mbg').classList.add('hide')}
 
 function rslots(){
-  var t=TM[$('mt').value]||'security_lock',sl=SLOTS[t]||{},i=ids();
+  var t=$('mt').value,sl=SLOTS[t]||{},i=ids();
+  var keys=Object.keys(sl);
+  if(!keys.length){$('ms').innerHTML='<span style="font-size:12px;color:var(--dim)">No slot mapping needed for this type.</span>';return}
   var h='<label style="font-size:12px;color:var(--dim)">Slot mapping</label>';
-  Object.keys(sl).forEach(function(k){
+  keys.forEach(function(k){
     h+='<div style="margin:6px 0"><span style="font-size:12px;color:var(--dim)">'+esc(sl[k])+'</span><select class="sl" data-s="'+esc(k)+'"><option value="">--</option>';
     i.forEach(function(e){h+='<option value="'+esc(e)+'">'+esc(e)+'</option>'});h+='</select></div>';
   });
@@ -249,19 +311,42 @@ function rslots(){
 
 function suggest(t,i){
   var bd={};i.forEach(function(e){var d=e.split('.')[0];if(!bd[d])bd[d]=[];bd[d].push(e)});
+  var first=function(){return i[0]||''};
+  var fromDom=function(doms){for(var x=0;x<doms.length;x++){var r=bd[doms[x]];if(r&&r.length)return r[0]}return ''};
+  var hints={
+    action_slot:       function(){return fromDom(['lock','switch'])||first()},
+    arm_slot:          function(){return fromDom(['alarm_control_panel','switch'])||first()},
+    trigger_slot:      function(){return fromDom(['binary_sensor','input_boolean','switch'])||first()},
+    actuator_slot:     function(){return fromDom(['cover','switch'])||first()},
+    switch_slot:       function(){return fromDom(['switch','light','fan','input_boolean'])||first()},
+    climate_slot:      function(){return fromDom(['climate'])||first()},
+    media_slot:        function(){return fromDom(['media_player'])||first()},
+    camera_slot:       function(){return fromDom(['camera'])||''},
+    primary_slot:      function(){return fromDom(['sensor','binary_sensor'])||first()},
+    position_slot:     function(){return fromDom(['cover'])||first()},
+    state_slot:        function(){return fromDom(['binary_sensor','sensor'])||i[1]||''},
+    position_sensor_slot:function(){return fromDom(['binary_sensor','cover'])||i[1]||''},
+    battery_slot:      function(){return fromDom(['sensor'])||''},
+    obstruction_slot:  function(){return fromDom(['binary_sensor'])?((bd.binary_sensor||[])[1]||''):''},
+    brightness_slot:   function(){return fromDom(['light'])||''},
+    color_slot:        function(){return fromDom(['light'])||''},
+    speed_slot:        function(){return fromDom(['fan'])||''},
+    tilt_slot:         function(){return ''},
+    power_slot:        function(){return fromDom(['switch','input_boolean'])||''},
+    power_sensor_slot: function(){return fromDom(['sensor'])||''},
+    volume_slot:       function(){return fromDom(['media_player','number','input_number'])||''},
+    air_quality_slot:  function(){return fromDom(['sensor'])||''},
+    filter_slot:       function(){return ''},
+    humidity_sensor_slot:function(){return fromDom(['sensor'])||''},
+    target_slot:       function(){return fromDom(['number','input_number'])||''},
+    temperature_sensor_slot:function(){return fromDom(['sensor'])||''},
+    timer_slot:        function(){return fromDom(['timer','input_number'])||''},
+    motion_slot:       function(){return fromDom(['binary_sensor'])||''},
+    secondary_slot:    function(){return (bd.sensor||[])[1]||''}
+  };
   $('ms').querySelectorAll('select.sl').forEach(function(s){
-    var k=s.getAttribute('data-s'),v='';
-    if(t==='security_lock'){
-      if(k==='action_slot')v=(bd.lock||[])[0]||(bd.switch||[])[0]||i[0]||'';
-      if(k==='state_slot')v=(bd.binary_sensor||[])[0]||i[1]||i[0]||'';
-      if(k==='battery_slot')v=(bd.sensor||[])[0]||'';
-      if(k==='obstruction_slot')v=(bd.binary_sensor||[])[1]||'';
-    }else{
-      if(k==='actuator_slot')v=(bd.cover||[])[0]||(bd.switch||[])[0]||i[0]||'';
-      if(k==='position_sensor_slot')v=(bd.binary_sensor||[])[0]||(bd.cover||[])[0]||i[1]||i[0]||'';
-      if(k==='battery_slot')v=(bd.sensor||[])[0]||'';
-    }
-    if(v)s.value=v;
+    var k=s.getAttribute('data-s');
+    var fn=hints[k];if(fn){var v=fn();if(v)s.value=v}
   });
 }
 
@@ -269,10 +354,9 @@ function suggest(t,i){
 $('mk').addEventListener('click',function(){
   var btn=$('mk');btn.disabled=true;btn.textContent='Creating…';
   var atype=$('mt').value;
-  var tmpl=TM[atype]||'security_lock';
   var sm={};$('ms').querySelectorAll('select.sl').forEach(function(s){var k=s.getAttribute('data-s');if(k&&s.value)sm[k]=s.value});
   var flowData={
-    template_id:tmpl,
+    template_id:atype,
     slots:sm,
     homekit_bridge_entry_id:bid,
     automated_ghosting:$('mg').checked,
