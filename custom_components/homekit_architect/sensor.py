@@ -1,4 +1,7 @@
-"""Virtual sensor platform for the 'sensor' template."""
+"""Virtual sensor platform for the 'sensor' template.
+
+Template pattern: state from slot entity (any domain); primary slot provides
+native_value and unit; optional secondary in attributes."""
 
 from __future__ import annotations
 
