@@ -45,6 +45,7 @@ select:focus,input:focus{border-color:var(--pri)}
 .msg{padding:10px;border-radius:6px;margin:10px 0;font-size:13px}
 .msg.ok{background:rgba(76,175,80,.15);color:var(--ok)}
 .msg.err{background:rgba(244,67,54,.15);color:var(--err)}
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:1000;min-width:280px;max-width:90%}
 .cnt{font-size:13px;color:var(--dim);margin-left:6px}
 .none{padding:14px;color:var(--dim);font-size:13px}
 .mbg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:999}
@@ -409,9 +410,11 @@ $('mk').addEventListener('click',function(){
   .then(function(r){
     done();cm();sel={};render();
     var title=r.title||name;
+    packages.push({entry_id:r.entry_id,title:title,template_id:atype||'switch',bridge_entry_id:bid,automated_ghosting:$('mg').checked});
+    renderPackages();
+    toast('Created "'+esc(title)+'". HomeKit bridge is reloading — the accessory will appear in the Home app shortly.','ok');
     loadBridges().then(function(){
       if(bid){$('bsel').value=bid;$('reloadBridge').disabled=false;}
-      toast('Created "'+esc(title)+'". HomeKit bridge is reloading — the accessory will appear in the Home app shortly.','ok');
     });
   })
   .catch(function(wsErr){
