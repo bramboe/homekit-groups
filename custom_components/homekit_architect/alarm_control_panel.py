@@ -1,4 +1,8 @@
-"""Virtual alarm_control_panel platform for 'security_system' template."""
+"""Virtual alarm_control_panel platform for 'security_system' template.
+
+Template pattern: state from slot entity (any domain); commands by slot domain.
+Alarm entity: native state. Switch/light/fan: on = armed_home, off = disarmed;
+arm/disarm forward to turn_on/turn_off."""
 
 from __future__ import annotations
 
@@ -14,7 +18,7 @@ from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .base import ArchitectBase, domain_of
+from .base import ArchitectBase, domain_of, slot_entity_is_on
 from .const import SLOT_ARM, SLOT_BATTERY, SLOT_STATE
 
 HANDLED_TEMPLATES = ("security_system",)
@@ -45,14 +49,18 @@ class ArchitectAlarm(ArchitectBase, AlarmControlPanelEntity):
     def _update_state(self) -> None:
         src = self._slot(SLOT_ARM)
         st = self.hass.states.get(src) if src else None
-        if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        dom = domain_of(src) if src else ""
+        if dom == "alarm_control_panel" and st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             try:
                 self._attr_alarm_state = AlarmControlPanelState(st.state)
             except ValueError:
                 self._attr_alarm_state = AlarmControlPanelState.DISARMED
         else:
-            self._attr_alarm_state = AlarmControlPanelState.DISARMED
-
+            # Any other domain (switch, light, fan): on = armed_home, off = disarmed
+            is_on = slot_entity_is_on(self.hass, src) if src else None
+            self._attr_alarm_state = (
+                AlarmControlPanelState.ARMED_HOME if is_on else AlarmControlPanelState.DISARMED
+            )
         self._attr_extra_state_attributes = self._read_battery()
 
     async def async_added_to_hass(self) -> None:
