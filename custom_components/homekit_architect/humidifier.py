@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .base import ArchitectBase, domain_of
 from .const import SLOT_HUMIDITY_SENSOR, SLOT_SWITCH, SLOT_TARGET
 
-HANDLED_TEMPLATES = ("humidifier", "dehumidifier")
+HANDLED_TEMPLATES = ("humidifier", "dehumidifier", "multi_service")
 
 
 async def async_setup_entry(
@@ -26,6 +26,12 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
+    if tid == "multi_service":
+        humidifier_slots = [k for k, eid in slots.items() if eid and domain_of(eid) == "humidifier"]
+        if not humidifier_slots:
+            return
+        async_add_entities([ArchitectHumidifier(hass, entry, "humidifier", slot_key=sk) for sk in humidifier_slots])
+        return
     if not slots.get(SLOT_SWITCH):
         return
     async_add_entities([ArchitectHumidifier(hass, entry, tid)])
@@ -33,8 +39,15 @@ async def async_setup_entry(
 
 class ArchitectHumidifier(ArchitectBase, HumidifierEntity):
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, tid: str) -> None:
-        self._architect_init(hass, entry, "humidifier")
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        tid: str,
+        slot_key: str | None = None,
+    ) -> None:
+        self._architect_init(hass, entry, "humidifier", slot_key=slot_key)
+        self._switch_slot = slot_key if slot_key else SLOT_SWITCH
         self._attr_device_class = (
             HumidifierDeviceClass.HUMIDIFIER if tid == "humidifier"
             else HumidifierDeviceClass.DEHUMIDIFIER
@@ -42,7 +55,7 @@ class ArchitectHumidifier(ArchitectBase, HumidifierEntity):
 
     @callback
     def _update_state(self) -> None:
-        src = self._slot(SLOT_SWITCH)
+        src = self._slot(self._switch_slot)
         st = self.hass.states.get(src) if src else None
         if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             self._attr_is_on = st.state == STATE_ON
@@ -53,7 +66,7 @@ class ArchitectHumidifier(ArchitectBase, HumidifierEntity):
         else:
             self._attr_is_on = None
 
-        hum_id = self._slot(SLOT_HUMIDITY_SENSOR)
+        hum_id = self._slot(SLOT_HUMIDITY_SENSOR) if not self._multi_slot_key else None
         if hum_id and not getattr(self, "_attr_current_humidity", None):
             hs = self.hass.states.get(hum_id)
             if hs and hs.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
@@ -65,16 +78,16 @@ class ArchitectHumidifier(ArchitectBase, HumidifierEntity):
 
     async def async_added_to_hass(self) -> None:
         self._update_state()
-        await self._async_track_slots(SLOT_SWITCH, SLOT_HUMIDITY_SENSOR, SLOT_TARGET)
+        await self._async_track_slots(self._switch_slot, SLOT_HUMIDITY_SENSOR, SLOT_TARGET)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await self._forward_service(self._slot(SLOT_SWITCH), "turn_on")
+        await self._forward_service(self._slot(self._switch_slot), "turn_on")
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._forward_service(self._slot(SLOT_SWITCH), "turn_off")
+        await self._forward_service(self._slot(self._switch_slot), "turn_off")
 
     async def async_set_humidity(self, humidity: int) -> None:
-        eid = self._slot(SLOT_TARGET) or self._slot(SLOT_SWITCH)
+        eid = self._slot(SLOT_TARGET) or self._slot(self._switch_slot)
         dom = domain_of(eid)
         if dom == "humidifier":
             await self._forward_service(eid, "set_humidity", {"humidity": humidity})
