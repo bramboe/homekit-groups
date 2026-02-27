@@ -214,12 +214,14 @@ function loadBridges(){
           include_domains:f.include_domains||[],exclude_domains:f.exclude_domains||[]
         }});
       }else if(e.domain==='homekit_architect'){
+        var d=e.data||{},o=e.options||{};
+        var bridgeId=(d.homekit_bridge_entry_id||o.homekit_bridge_entry_id||'').toString();
         packages.push({
           entry_id:e.entry_id,
-          title:e.title||((e.data||{}).friendly_name)||'Architect package',
-          template_id:(e.data||{}).template_id||'',
-          bridge_entry_id:(e.data||{}).homekit_bridge_entry_id||'',
-          automated_ghosting:(e.data||{}).automated_ghosting!==false
+          title:e.title||d.friendly_name||'Architect package',
+          template_id:d.template_id||'',
+          bridge_entry_id:bridgeId,
+          automated_ghosting:d.automated_ghosting!==false
         });
       }
     });
@@ -244,10 +246,11 @@ function renderPackages(){
     return;
   }
   var map={};
-  bridges.forEach(function(b){map[b.entry_id]=b.title});
+  bridges.forEach(function(b){map[String(b.entry_id)]=b.title});
   var h='';
   packages.forEach(function(p){
-    var bt=map[p.bridge_entry_id]||'Unknown bridge';
+    var bid=String(p.bridge_entry_id||'');
+    var bt=map[bid]||(bid?'Bridge '+bid.substring(0,8)+'…':'Unknown bridge');
     var type=p.template_id||'group';
     h+='<div class="prow" data-id="'+esc(p.entry_id)+'">'
       +'<div class="pname">'+esc(p.title)+'</div>'
