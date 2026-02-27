@@ -34,6 +34,7 @@ def async_register_websocket_handlers(hass: HomeAssistant) -> None:
     """Register WebSocket commands for the Architect panel."""
     websocket_api.async_register_command(hass, ws_list_bridges)
     websocket_api.async_register_command(hass, ws_bridge_entities)
+    websocket_api.async_register_command(hass, ws_list_templates)
     websocket_api.async_register_command(hass, ws_package_accessory)
 
 
@@ -68,6 +69,38 @@ async def ws_list_bridges(
             }
         )
     connection.send_result(msg["id"], {"bridges": bridges})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/list_templates",
+    }
+)
+@callback
+def ws_list_templates(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return template definitions with required/optional slots for slot-assignment UI."""
+    templates = []
+    for tid, t in TEMPLATES.items():
+        labels = t.get("slot_labels") or {}
+        required = [
+            {"key": k, "label": labels.get(k, k)}
+            for k in (t.get("required_slots") or [])
+        ]
+        optional = [
+            {"key": k, "label": labels.get(k, k)}
+            for k in (t.get("optional_slots") or [])
+        ]
+        templates.append({
+            "id": tid,
+            "name": t.get("name", tid),
+            "required_slots": required,
+            "optional_slots": optional,
+        })
+    connection.send_result(msg["id"], {"templates": templates})
 
 
 def _entities_exposed_by_bridge_filter(hass: HomeAssistant, filter_config: dict) -> list[str]:
