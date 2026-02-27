@@ -1,4 +1,8 @@
-"""Virtual switch platform for switch, outlet, faucet, shower, sprinkler."""
+"""Virtual switch platform for switch, outlet, faucet, shower, sprinkler.
+
+Template pattern: state from slot entity (any domain with on/off); commands
+forwarded using the slot's domain (light.turn_on, fan.turn_on, switch.turn_on, etc.).
+"""
 
 from __future__ import annotations
 
