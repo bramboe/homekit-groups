@@ -1,4 +1,8 @@
-"""Virtual climate platform for 'thermostat' template (proxies a climate entity)."""
+"""Virtual climate platform for 'thermostat' template.
+
+Template pattern: state from slot entity (any domain); commands by slot domain.
+Climate entity: full thermostat. Switch/light/fan: on = heat, off = off;
+set_hvac_mode forwards to turn_on/turn_off."""
 
 from __future__ import annotations
 
@@ -19,7 +23,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .base import ArchitectBase
+from .base import ArchitectBase, domain_of, slot_entity_is_on
 from .const import SLOT_CLIMATE, SLOT_HUMIDITY_SENSOR, SLOT_TEMPERATURE_SENSOR
 
 HANDLED_TEMPLATES = ("thermostat",)
@@ -50,7 +54,8 @@ class ArchitectClimate(ArchitectBase, ClimateEntity):
     def _update_state(self) -> None:
         src = self._slot(SLOT_CLIMATE)
         st = self.hass.states.get(src) if src else None
-        if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        dom = domain_of(src) if src else ""
+        if dom == "climate" and st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             try:
                 self._attr_hvac_mode = HVACMode(st.state)
             except ValueError:
@@ -62,10 +67,15 @@ class ArchitectClimate(ArchitectBase, ClimateEntity):
             self._attr_min_temp = attrs.get("min_temp", 7)
             self._attr_max_temp = attrs.get("max_temp", 35)
         else:
-            self._attr_hvac_mode = HVACMode.OFF
+            # Any other domain (switch, light, fan): on = heat, off = off
+            is_on = slot_entity_is_on(self.hass, src) if src else None
+            self._attr_hvac_mode = HVACMode.HEAT if is_on else HVACMode.OFF
+            if not dom == "climate":
+                self._attr_target_temperature = None
+                self._attr_current_temperature = None
 
         temp_id = self._slot(SLOT_TEMPERATURE_SENSOR)
-        if temp_id and not self._attr_current_temperature:
+        if temp_id and self._attr_current_temperature is None:
             ts = self.hass.states.get(temp_id)
             if ts and ts.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 try:
@@ -89,10 +99,21 @@ class ArchitectClimate(ArchitectBase, ClimateEntity):
         await self._async_track_slots(SLOT_CLIMATE, SLOT_TEMPERATURE_SENSOR, SLOT_HUMIDITY_SENSOR)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        await self._forward_service(self._slot(SLOT_CLIMATE), "set_hvac_mode", {"hvac_mode": hvac_mode})
+        eid = self._slot(SLOT_CLIMATE)
+        dom = domain_of(eid)
+        if dom == "climate":
+            await self._forward_service(eid, "set_hvac_mode", {"hvac_mode": hvac_mode})
+        else:
+            # Switch/light/fan: heat/cool/auto = turn_on, off = turn_off
+            await self._forward_service(
+                eid, "turn_on" if hvac_mode != HVACMode.OFF else "turn_off"
+            )
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
+        eid = self._slot(SLOT_CLIMATE)
+        if domain_of(eid) != "climate":
+            return
         data: dict[str, Any] = {}
         if ATTR_TEMPERATURE in kwargs:
             data[ATTR_TEMPERATURE] = kwargs[ATTR_TEMPERATURE]
-        await self._forward_service(self._slot(SLOT_CLIMATE), "set_temperature", data)
+        await self._forward_service(eid, "set_temperature", data)
