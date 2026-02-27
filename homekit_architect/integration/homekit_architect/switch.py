@@ -13,7 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .base import ArchitectBase, domain_of
 from .const import SLOT_BATTERY, SLOT_POWER_SENSOR, SLOT_STATE, SLOT_SWITCH, SLOT_TIMER
 
-HANDLED_TEMPLATES = ("switch", "outlet", "faucet", "shower", "sprinkler")
+HANDLED_TEMPLATES = ("switch", "outlet", "faucet", "shower", "sprinkler", "multi_service")
 
 DEVICE_CLASS_MAP = {
     "outlet": SwitchDeviceClass.OUTLET,
@@ -28,6 +28,12 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
+    if tid == "multi_service":
+        switch_slots = [k for k, eid in slots.items() if eid and domain_of(eid) == "switch"]
+        if not switch_slots:
+            return
+        async_add_entities([ArchitectSwitch(hass, entry, tid, slot_key=sk) for sk in switch_slots])
+        return
     if not slots.get(SLOT_SWITCH):
         return
     async_add_entities([ArchitectSwitch(hass, entry, tid)])
@@ -35,15 +41,22 @@ async def async_setup_entry(
 
 class ArchitectSwitch(ArchitectBase, SwitchEntity):
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, tid: str) -> None:
-        self._architect_init(hass, entry, "switch")
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        tid: str,
+        slot_key: str | None = None,
+    ) -> None:
+        self._architect_init(hass, entry, "switch", slot_key=slot_key)
+        self._switch_slot_key = slot_key if slot_key else SLOT_SWITCH
         dc = DEVICE_CLASS_MAP.get(tid)
         if dc:
             self._attr_device_class = dc
 
     @callback
     def _update_state(self) -> None:
-        state_eid = self._slot(SLOT_STATE) or self._slot(SLOT_SWITCH)
+        state_eid = self._slot(SLOT_STATE) or self._slot(self._switch_slot_key)
         st = self.hass.states.get(state_eid) if state_eid else None
         if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             self._attr_is_on = st.state == STATE_ON
@@ -63,12 +76,14 @@ class ArchitectSwitch(ArchitectBase, SwitchEntity):
 
     async def async_added_to_hass(self) -> None:
         self._update_state()
-        await self._async_track_slots(SLOT_SWITCH, SLOT_STATE, SLOT_POWER_SENSOR, SLOT_BATTERY, SLOT_TIMER)
+        await self._async_track_slots(
+            self._switch_slot_key, SLOT_STATE, SLOT_POWER_SENSOR, SLOT_BATTERY, SLOT_TIMER
+        )
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        eid = self._slot(SLOT_SWITCH)
+        eid = self._slot(self._switch_slot_key)
         await self._forward_service(eid, "turn_on")
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        eid = self._slot(SLOT_SWITCH)
+        eid = self._slot(self._switch_slot_key)
         await self._forward_service(eid, "turn_off")
