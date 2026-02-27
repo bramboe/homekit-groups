@@ -109,6 +109,7 @@ select:focus,input:focus{border-color:var(--pri)}
       <option value="switch">Switch</option>
       <option value="thermostat">Thermostat</option>
       <option value="fan">Fan</option>
+      <option value="fan_light">Fan + Light</option>
       <option value="air_purifier">Air Purifier</option>
       <option value="humidifier">Humidifier</option>
       <option value="dehumidifier">Dehumidifier</option>
@@ -204,6 +205,13 @@ var DOMAIN_TO_TYPE={
   switch:'switch',input_boolean:'switch'
 };
 function detectType(selectedIds){
+  var doms={};
+  for(var i=0;i<selectedIds.length;i++){
+    var dom=selectedIds[i].split('.')[0];
+    doms[dom]=true;
+    if(DOMAIN_TO_TYPE[dom]){ /* keep going to check for combo */ }
+  }
+  if(doms.fan&&doms.light)return 'fan_light';
   for(var i=0;i<selectedIds.length;i++){
     var dom=selectedIds[i].split('.')[0];
     if(DOMAIN_TO_TYPE[dom])return DOMAIN_TO_TYPE[dom];
@@ -381,8 +389,9 @@ function renderSlotAssignment(selectedIds,typeId){
   el.innerHTML=h||'';
   el.querySelectorAll('.slotsel').forEach(function(sel){
     var key=sel.getAttribute('data-slot-key');
-    var isReq=t.required_slots.some(function(s){return s.key===key});
-    if(isReq&&firstId)sel.value=firstId;
+    var reqIdx=t.required_slots.findIndex(function(s){return s.key===key});
+    if(reqIdx>=0&&selectedIds[reqIdx])sel.value=selectedIds[reqIdx];
+    else if(reqIdx>=0&&firstId)sel.value=firstId;
   });
   $('mslots').style.display=h?'block':'none';
 }
