@@ -38,15 +38,31 @@ async def async_setup_entry(
     tid = entry.data.get("template_id")
     if tid not in HANDLED_TEMPLATES:
         return
+    slots = entry.data.get("slots") or {}
+    if tid == "multi_service":
+        cover_slots = [k for k, eid in slots.items() if eid and domain_of(eid) == "cover"]
+        if not cover_slots:
+            return
+        async_add_entities([ArchitectCover(hass, entry, "cover", slot_key=sk) for sk in cover_slots])
+        return
     async_add_entities([ArchitectCover(hass, entry, tid)])
 
 
 class ArchitectCover(ArchitectBase, CoverEntity):
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, tid: str) -> None:
-        self._architect_init(hass, entry, "cover")
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        tid: str,
+        slot_key: str | None = None,
+    ) -> None:
+        self._architect_init(hass, entry, "cover", slot_key=slot_key)
         self._tid = tid
-        self._attr_device_class = DEVICE_CLASS_MAP.get(tid)
+        # Multi-service: one slot for actuator and position (same entity); no template device_class
+        self._actuator_slot = slot_key if slot_key else SLOT_ACTUATOR
+        self._position_slot = slot_key if slot_key else SLOT_POSITION_SENSOR
+        self._attr_device_class = DEVICE_CLASS_MAP.get(tid) if tid in DEVICE_CLASS_MAP else CoverDeviceClass.SHADE
 
         features = CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE
         if tid == "window_covering" and self._slot(SLOT_TILT):
@@ -55,10 +71,10 @@ class ArchitectCover(ArchitectBase, CoverEntity):
 
     @callback
     def _update_state(self) -> None:
-        if self._tid == "window_covering":
+        if self._tid == "window_covering" and not self._multi_slot_key:
             src = self._slot(SLOT_POSITION)
         else:
-            src = self._slot(SLOT_POSITION_SENSOR) or self._slot(SLOT_ACTUATOR)
+            src = self._slot(self._position_slot) or self._slot(self._actuator_slot)
 
         st = self.hass.states.get(src) if src else None
         val = st.state if st else STATE_UNKNOWN
@@ -78,7 +94,7 @@ class ArchitectCover(ArchitectBase, CoverEntity):
         else:
             self._attr_is_closed = val == STATE_ON
 
-        obs_id = self._slot(SLOT_OBSTRUCTION)
+        obs_id = self._slot(SLOT_OBSTRUCTION) if not self._multi_slot_key else None
         if obs_id:
             obs = self.hass.states.get(obs_id)
             self._attr_extra_state_attributes = {"obstruction": obs and obs.state == STATE_ON}
@@ -89,7 +105,7 @@ class ArchitectCover(ArchitectBase, CoverEntity):
     async def async_added_to_hass(self) -> None:
         self._update_state()
         await self._async_track_slots(
-            SLOT_ACTUATOR, SLOT_POSITION_SENSOR, SLOT_POSITION,
+            self._actuator_slot, self._position_slot, SLOT_POSITION,
             SLOT_OBSTRUCTION, SLOT_BATTERY,
         )
 
@@ -100,7 +116,7 @@ class ArchitectCover(ArchitectBase, CoverEntity):
         await self._actuate("close")
 
     async def _actuate(self, action: str) -> None:
-        eid = self._slot(SLOT_ACTUATOR) or self._slot(SLOT_POSITION)
+        eid = self._slot(self._actuator_slot) or self._slot(SLOT_POSITION)
         if not eid:
             return
         dom = domain_of(eid)
