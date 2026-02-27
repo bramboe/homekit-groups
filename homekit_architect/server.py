@@ -413,16 +413,25 @@ $('mk').addEventListener('click',function(){
     entity_ids:ids(),slot_mapping:sm,hide_sources:$('mg').checked
   })
   .then(function(r){onOk(r.title||name)})
-  .catch(function(){
-    restCreate({template_id:atype,slots:sm,homekit_bridge_entry_id:bid,
-      automated_ghosting:$('mg').checked,friendly_name:name})
-    .then(function(r){
-      if(r.type==='create_entry') onOk(r.title||name);
-      else onErr(r.reason||'Could not create accessory');
-    })
-    .catch(onErr);
+  .catch(function(wsErr){
+    btn.disabled=false;btn.textContent='Create';
+    showRestartBanner(String(wsErr));
   });
 });
+
+function showRestartBanner(detail){
+  $('toast').innerHTML='<div class="msg err" style="line-height:1.6">'
+    +'Home Assistant needs a restart to load the updated integration.<br>'
+    +'<small style="color:#aaa">'+esc(detail)+'</small><br>'
+    +'<button id="rbtn" class="btn bp" style="margin-top:8px">Restart Home Assistant</button>'
+    +'</div>';
+  $('rbtn').addEventListener('click',function(){
+    $('rbtn').disabled=true;$('rbtn').textContent='Restarting…';
+    haPost('/services/homeassistant/restart',{})
+    .then(function(){$('toast').innerHTML='<div class="msg ok">Restarting… page will reload in 60 seconds.</div>';setTimeout(function(){location.reload()},60000)})
+    .catch(function(e){$('toast').innerHTML='<div class="msg err">Could not restart: '+esc(String(e))+'</div>'});
+  });
+}
 
 function toast(t,c){$('toast').innerHTML='<div class="msg '+c+'">'+t+'</div>';setTimeout(function(){$('toast').innerHTML=''},6000)}
 
