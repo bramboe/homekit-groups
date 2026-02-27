@@ -49,6 +49,8 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Create an accessory from the panel (single-shot, no interactive UI steps)."""
         if user_input is None:
+            user_input = self.context.get("panel_data")
+        if not user_input:
             return self.async_abort(reason="invalid_panel_data")
         template_id = user_input.get(CONF_TEMPLATE_ID)
         slots = user_input.get(CONF_SLOTS) or {}
