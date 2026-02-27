@@ -110,6 +110,7 @@ select:focus,input:focus{border-color:var(--pri)}
       <option value="thermostat">Thermostat</option>
       <option value="fan">Fan</option>
       <option value="fan_light">Fan + Light</option>
+      <option value="multi_service">Multi-Service (2–8 controls)</option>
       <option value="air_purifier">Air Purifier</option>
       <option value="humidifier">Humidifier</option>
       <option value="dehumidifier">Dehumidifier</option>
@@ -211,6 +212,8 @@ function detectType(selectedIds){
     doms[dom]=true;
     if(DOMAIN_TO_TYPE[dom]){ /* keep going to check for combo */ }
   }
+  var multiDomains='switch|light|fan|lock|cover|climate|media_player|humidifier|alarm_control_panel|binary_sensor|sensor|camera|input_boolean';
+  if(selectedIds.length>=2&&multiDomains.split('|').some(function(d){return doms[d]}))return 'multi_service';
   if(doms.fan&&doms.light)return 'fan_light';
   for(var i=0;i<selectedIds.length;i++){
     var dom=selectedIds[i].split('.')[0];
