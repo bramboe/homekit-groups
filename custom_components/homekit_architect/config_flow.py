@@ -20,18 +20,17 @@ from .const import (
     TEMPLATES,
 )
 
-CONF_PANEL_PACKAGE = "panel_package"
-
 HOMEKIT_DOMAIN = "homekit"
-HOMEKIT_MODE_BRIDGE = "bridge"
 
 
 def _homekit_bridge_entries(hass: HomeAssistant) -> list[tuple[str, str]]:
-    """Return list of (entry_id, title) for HomeKit bridges (bridge mode only)."""
+    """Return (entry_id, title) for HomeKit bridges."""
     result = []
     for entry in hass.config_entries.async_entries(HOMEKIT_DOMAIN):
-        if entry.options.get("homekit_mode") == HOMEKIT_MODE_BRIDGE:
-            result.append((entry.entry_id, entry.title or entry.data.get("name", entry.entry_id)))
+        mode = entry.options.get("homekit_mode") or entry.data.get("homekit_mode", "bridge")
+        if mode == "accessory":
+            continue
+        result.append((entry.entry_id, entry.title or entry.data.get("name", entry.entry_id)))
     return result
 
 
@@ -48,12 +47,16 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_panel(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Create an accessory from the Configuration Panel (no UI steps)."""
+        """Create an accessory from the panel (single-shot, no interactive UI steps)."""
         if user_input is None:
             return self.async_abort(reason="invalid_panel_data")
         template_id = user_input.get(CONF_TEMPLATE_ID)
         slots = user_input.get(CONF_SLOTS) or {}
-        bridge_entry_id = user_input.get(CONF_HOMEKIT_BRIDGE_ENTRY_ID) or user_input.get("homekit_bridge_entry_id") or ""
+        bridge_entry_id = (
+            user_input.get(CONF_HOMEKIT_BRIDGE_ENTRY_ID)
+            or user_input.get("homekit_bridge_entry_id")
+            or ""
+        )
         automated_ghosting = user_input.get(CONF_AUTOMATED_GHOSTING, True)
         friendly_name = (user_input.get(CONF_ARCHITECT_ENTITY_FRIENDLY_NAME) or "").strip()
 
@@ -79,7 +82,7 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Template selection or, when launched from panel, create entry from panel data."""
+        """Template selection (or panel shortcut)."""
         if self.context.get("source") == "panel" and self.context.get("panel_package"):
             panel_data = self.context.get("panel_data") or {}
             return await self.async_step_panel(panel_data)
@@ -88,7 +91,6 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _async_step_user_impl(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Template selection."""
         if user_input is not None:
             self._template_id = user_input[CONF_TEMPLATE_ID]
             return await self.async_step_slots()
@@ -97,9 +99,7 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_TEMPLATE_ID): vol.In(template_options),
-                }
+                {vol.Required(CONF_TEMPLATE_ID): vol.In(template_options)}
             ),
         )
 
@@ -112,10 +112,8 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="invalid_template")
 
         if user_input is not None:
-            self._slots = {k: v for k, v in user_input.items() if v and k in (
-                template["required_slots"] + template["optional_slots"]
-            )}
-            # Validate required slots
+            all_slots = template["required_slots"] + template["optional_slots"]
+            self._slots = {k: v for k, v in user_input.items() if v and k in all_slots}
             for slot in template["required_slots"]:
                 if not self._slots.get(slot):
                     return self.async_show_form(
@@ -131,24 +129,18 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     def _slots_schema(self, template: dict) -> vol.Schema:
-        """Build schema with entity selectors for required + optional slots."""
         schema = {}
         for slot in template["required_slots"] + template["optional_slots"]:
-            label = template["slot_labels"].get(slot, slot)
             required = slot in template["required_slots"]
             key = vol.Required(slot) if required else vol.Optional(slot, default="")
             schema[key] = selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    multiple=False,
-                    include_entities=self._slots.get(slot) or None,
-                )
+                selector.EntitySelectorConfig(multiple=False)
             )
         return vol.Schema(schema)
 
     async def async_step_bridge(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Pick target HomeKit Bridge."""
         if user_input is not None:
             self._bridge_entry_id = user_input.get(CONF_HOMEKIT_BRIDGE_ENTRY_ID)
             return await self.async_step_ghosting()
@@ -177,7 +169,6 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_ghosting(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ghosting toggle and optional friendly name."""
         template = TEMPLATES.get(self._template_id or "")
         if not template:
             return self.async_abort(reason="invalid_template")
@@ -191,19 +182,13 @@ class HomeKitArchitectConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_AUTOMATED_GHOSTING: user_input.get(CONF_AUTOMATED_GHOSTING, True),
                 CONF_ARCHITECT_ENTITY_FRIENDLY_NAME: friendly or template["name"],
             }
-            return self.async_create_entry(
-                title=friendly or template["name"],
-                data=data,
-            )
+            return self.async_create_entry(title=friendly or template["name"], data=data)
 
         return self.async_show_form(
             step_id="ghosting",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_AUTOMATED_GHOSTING,
-                        default=True,
-                    ): selector.BooleanSelector(),
+                    vol.Required(CONF_AUTOMATED_GHOSTING, default=True): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ARCHITECT_ENTITY_FRIENDLY_NAME,
                         default=self._friendly_name or template["name"],
