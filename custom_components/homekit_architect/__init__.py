@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -53,6 +54,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if entry.data.get(CONF_AUTOMATED_GHOSTING) and entry.data.get(
         CONF_HOMEKIT_BRIDGE_ENTRY_ID
     ):
+        # Let the entity registry pick up the new virtual entity before applying ghosting
+        await asyncio.sleep(2.0)
         await async_apply_ghosting(hass, entry)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
