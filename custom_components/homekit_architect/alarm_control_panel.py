@@ -21,7 +21,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .base import ArchitectBase, domain_of, slot_entity_is_on
 from .const import SLOT_ARM, SLOT_BATTERY, SLOT_STATE
 
-HANDLED_TEMPLATES = ("security_system",)
+HANDLED_TEMPLATES = ("security_system", "multi_service")
 
 
 async def async_setup_entry(
@@ -31,6 +31,12 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
+    if tid == "multi_service":
+        alarm_slots = [k for k, eid in slots.items() if eid and domain_of(eid) == "alarm_control_panel"]
+        if not alarm_slots:
+            return
+        async_add_entities([ArchitectAlarm(hass, entry, slot_key=sk) for sk in alarm_slots])
+        return
     if not slots.get(SLOT_ARM):
         return
     async_add_entities([ArchitectAlarm(hass, entry)])
@@ -38,8 +44,14 @@ async def async_setup_entry(
 
 class ArchitectAlarm(ArchitectBase, AlarmControlPanelEntity):
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        self._architect_init(hass, entry, "alarm_control_panel")
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        slot_key: str | None = None,
+    ) -> None:
+        self._architect_init(hass, entry, "alarm_control_panel", slot_key=slot_key)
+        self._arm_slot = slot_key if slot_key else SLOT_ARM
         self._attr_supported_features = (
             AlarmControlPanelEntityFeature.ARM_HOME
             | AlarmControlPanelEntityFeature.ARM_AWAY
@@ -47,7 +59,7 @@ class ArchitectAlarm(ArchitectBase, AlarmControlPanelEntity):
 
     @callback
     def _update_state(self) -> None:
-        src = self._slot(SLOT_ARM)
+        src = self._slot(self._arm_slot)
         st = self.hass.states.get(src) if src else None
         dom = domain_of(src) if src else ""
         if dom == "alarm_control_panel" and st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
@@ -65,10 +77,10 @@ class ArchitectAlarm(ArchitectBase, AlarmControlPanelEntity):
 
     async def async_added_to_hass(self) -> None:
         self._update_state()
-        await self._async_track_slots(SLOT_ARM, SLOT_STATE, SLOT_BATTERY)
+        await self._async_track_slots(self._arm_slot, SLOT_STATE, SLOT_BATTERY)
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
-        eid = self._slot(SLOT_ARM)
+        eid = self._slot(self._arm_slot)
         dom = domain_of(eid)
         if dom == "alarm_control_panel":
             await self._forward_service(eid, "alarm_arm_home")
@@ -76,7 +88,7 @@ class ArchitectAlarm(ArchitectBase, AlarmControlPanelEntity):
             await self._forward_service(eid, "turn_on")
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
-        eid = self._slot(SLOT_ARM)
+        eid = self._slot(self._arm_slot)
         dom = domain_of(eid)
         if dom == "alarm_control_panel":
             await self._forward_service(eid, "alarm_arm_away")
@@ -84,7 +96,7 @@ class ArchitectAlarm(ArchitectBase, AlarmControlPanelEntity):
             await self._forward_service(eid, "turn_on")
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
-        eid = self._slot(SLOT_ARM)
+        eid = self._slot(self._arm_slot)
         dom = domain_of(eid)
         if dom == "alarm_control_panel":
             await self._forward_service(eid, "alarm_disarm")
