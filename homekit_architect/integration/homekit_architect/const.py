@@ -49,6 +49,10 @@ SLOT_AIR_QUALITY = "air_quality_slot"
 SLOT_FILTER = "filter_slot"
 SLOT_TIMER = "timer_slot"
 
+# Combo templates: one accessory with multiple services (e.g. Fan + Light)
+SLOT_FAN_SWITCH = "fan_switch_slot"
+SLOT_LIGHT_SWITCH = "light_switch_slot"
+
 # ── Template definitions ─────────────────────────────────────────────────
 # Each template maps to one HA platform and defines required/optional slots.
 
@@ -188,6 +192,17 @@ TEMPLATES = {
             SLOT_SPEED: "Speed control (optional)",
             SLOT_BATTERY: "Battery (optional)",
         },
+    },
+    "fan_light": {
+        "name": "Fan + Light",
+        "platforms": ["fan", "light"],
+        "required_slots": [SLOT_FAN_SWITCH, SLOT_LIGHT_SWITCH],
+        "optional_slots": [],
+        "slot_labels": {
+            SLOT_FAN_SWITCH: "Fan on/off",
+            SLOT_LIGHT_SWITCH: "Light on/off",
+        },
+        "platform_slots": {"fan": SLOT_FAN_SWITCH, "light": SLOT_LIGHT_SWITCH},
     },
     "air_purifier": {
         "name": "Air Purifier",
