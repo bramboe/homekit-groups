@@ -175,6 +175,18 @@ function haPost(path,body){
     return fetch('/api'+path,{method:'POST',headers:{'Authorization':'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(body)});
   }).then(handleResp);
 }
+function haDelete(path){
+  return getToken().then(function(t){
+    return fetch('/api'+path,{method:'DELETE',headers:{'Authorization':'Bearer '+t}});
+  }).then(function(r){
+    if(r.ok) return;
+    return r.text().then(function(body){
+      var detail=body;
+      try{var j=JSON.parse(body);detail=j.message||j.error||j.detail||body}catch(e){}
+      throw new Error(r.status+' '+r.statusText+': '+detail);
+    });
+  });
+}
 
 /* ── Helpers ──── */
 var bridges=[],bid='',ents=[],sel={},q='',df={},packages=[];
@@ -263,7 +275,7 @@ function renderPackages(){
     btn.addEventListener('click',function(ev){
       var id=btn.getAttribute('data-del');
       if(!confirm('Delete this package?'))return;
-      haPost('/config/config_entries/entry/'+id,{})
+      haDelete('/config/config_entries/entry/'+id)
       .then(function(){packages=packages.filter(function(p){return p.entry_id!==id});renderPackages()})
       .catch(function(e){toast(String(e),'err')});
       ev.stopPropagation();
