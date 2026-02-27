@@ -25,7 +25,6 @@ def get_slot_entity_ids(entry: ConfigEntry) -> list[str]:
     slots: dict = entry.data.get(CONF_SLOTS) or {}
     return [e for e in slots.values() if e]
 
-
 _LOGGER = logging.getLogger(__name__)
 
 HOMEKIT_DOMAIN = "homekit"
@@ -63,6 +62,8 @@ async def async_apply_ghosting(hass: HomeAssistant, entry: ConfigEntry) -> None:
             platform,
             entry.entry_id,
         )
+        # Still apply exclusion of slots so raw entities are hidden
+        # User can re-save options to add include once entity exists
     slot_entity_ids = get_slot_entity_ids(entry)
 
     options = deepcopy(dict(homekit_entry.options))
