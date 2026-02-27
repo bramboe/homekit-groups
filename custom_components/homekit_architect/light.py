@@ -23,9 +23,15 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base import ArchitectBase, domain_of
-from .const import SLOT_BRIGHTNESS, SLOT_COLOR, SLOT_SWITCH
+from .const import SLOT_BRIGHTNESS, SLOT_COLOR, SLOT_SWITCH, TEMPLATES
 
-HANDLED_TEMPLATES = ("lightbulb",)
+HANDLED_TEMPLATES = ("lightbulb", "fan_light")
+
+
+def _light_switch_slot_key(template_id: str) -> str:
+    """Slot key for light on/off (combo template uses light_switch_slot)."""
+    t = TEMPLATES.get(template_id) or {}
+    return t.get("platform_slots", {}).get("light") or SLOT_SWITCH
 
 
 async def async_setup_entry(
@@ -35,7 +41,8 @@ async def async_setup_entry(
     if tid not in HANDLED_TEMPLATES:
         return
     slots = entry.data.get("slots") or {}
-    if not slots.get(SLOT_SWITCH):
+    switch_key = _light_switch_slot_key(tid)
+    if not slots.get(switch_key):
         return
     async_add_entities([ArchitectLight(hass, entry)])
 
@@ -44,8 +51,9 @@ class ArchitectLight(ArchitectBase, LightEntity):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self._architect_init(hass, entry, "light")
+        self._switch_slot_key = _light_switch_slot_key(entry.data.get("template_id", ""))
         modes: set[ColorMode] = set()
-        src = self._slot(SLOT_SWITCH)
+        src = self._slot(self._switch_slot_key)
         dom = domain_of(src) if src else ""
         if self._slot(SLOT_COLOR) and dom == "light":
             modes.add(ColorMode.HS)
@@ -58,7 +66,7 @@ class ArchitectLight(ArchitectBase, LightEntity):
 
     @callback
     def _update_state(self) -> None:
-        src = self._slot(SLOT_SWITCH)
+        src = self._slot(self._switch_slot_key)
         st = self.hass.states.get(src) if src else None
         dom = domain_of(src) if src else ""
         if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
@@ -86,10 +94,12 @@ class ArchitectLight(ArchitectBase, LightEntity):
 
     async def async_added_to_hass(self) -> None:
         self._update_state()
-        await self._async_track_slots(SLOT_SWITCH, SLOT_BRIGHTNESS, SLOT_COLOR)
+        await self._async_track_slots(
+            self._switch_slot_key, SLOT_BRIGHTNESS, SLOT_COLOR
+        )
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        eid = self._slot(SLOT_SWITCH)
+        eid = self._slot(self._switch_slot_key)
         dom = domain_of(eid) if eid else ""
         data: dict[str, Any] = {}
         if dom == "light":
@@ -103,4 +113,4 @@ class ArchitectLight(ArchitectBase, LightEntity):
         await self._forward_service(eid, "turn_on", data if data else None)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._forward_service(self._slot(SLOT_SWITCH), "turn_off")
+        await self._forward_service(self._slot(self._switch_slot_key), "turn_off")
