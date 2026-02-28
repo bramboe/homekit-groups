@@ -1,7 +1,7 @@
 ---
 name: HomeKit Entity Architect
 description: Group raw entities into single HomeKit accessories (Smart Lock, Garage Door) and optionally ghost the source entities from your bridge.
-version: "2.2.21"
+version: "2.2.22"
 slug: homekit_architect
 url: https://github.com/bramboe/homekit-groups
 arch:
