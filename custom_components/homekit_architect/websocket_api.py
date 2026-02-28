@@ -20,19 +20,64 @@ from .const import (
     CONF_INCLUDE_DOMAINS,
     CONF_INCLUDE_ENTITIES,
     DOMAIN,
-    MULTI_SERVICE_DOMAIN_TO_PLATFORM,
-    SLOT_OCTONARY,
-    SLOT_PRIMARY,
-    SLOT_QUATERNARY,
-    SLOT_QUINARY,
-    SLOT_SECONDARY,
-    SLOT_SENARY,
-    SLOT_SEPTENARY,
-    SLOT_TERTIARY,
     TEMPLATES,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# Fallback multi_service template (same slot keys as const) so package_accessory
+# accepts "multi_service" even when const.py is from an older install.
+_MULTI_SERVICE_TEMPLATE_FALLBACK = {
+    "name": "Multi-Service",
+    "platforms": [
+        "alarm_control_panel",
+        "binary_sensor",
+        "camera",
+        "climate",
+        "cover",
+        "fan",
+        "humidifier",
+        "light",
+        "lock",
+        "media_player",
+        "sensor",
+        "switch",
+    ],
+    "required_slots": ["primary_slot", "secondary_slot"],
+    "optional_slots": [
+        "tertiary_slot",
+        "quaternary_slot",
+        "quinary_slot",
+        "senary_slot",
+        "septenary_slot",
+        "octonary_slot",
+    ],
+    "slot_labels": {
+        "primary_slot": "Control 1",
+        "secondary_slot": "Control 2",
+        "tertiary_slot": "Control 3",
+        "quaternary_slot": "Control 4",
+        "quinary_slot": "Control 5",
+        "senary_slot": "Control 6",
+        "septenary_slot": "Control 7",
+        "octonary_slot": "Control 8",
+    },
+}
+_MULTI_SERVICE_DOMAINS = {
+    "alarm_control_panel",
+    "binary_sensor",
+    "camera",
+    "climate",
+    "cover",
+    "fan",
+    "humidifier",
+    "input_boolean",
+    "light",
+    "lock",
+    "media_player",
+    "sensor",
+    "switch",
+}
 
 HOMEKIT_DOMAIN = "homekit"
 HOMEKIT_MODE_BRIDGE = "bridge"
@@ -291,31 +336,8 @@ async def ws_reload_bridge(
 
 def _ensure_multi_service_template() -> None:
     """Inject multi_service into TEMPLATES if missing (e.g. older integration install)."""
-    if "multi_service" in TEMPLATES or not MULTI_SERVICE_DOMAIN_TO_PLATFORM:
-        return
-    TEMPLATES["multi_service"] = {
-        "name": "Multi-Service",
-        "platforms": list(dict.fromkeys(MULTI_SERVICE_DOMAIN_TO_PLATFORM.values())),
-        "required_slots": [SLOT_PRIMARY, SLOT_SECONDARY],
-        "optional_slots": [
-            SLOT_TERTIARY,
-            SLOT_QUATERNARY,
-            SLOT_QUINARY,
-            SLOT_SENARY,
-            SLOT_SEPTENARY,
-            SLOT_OCTONARY,
-        ],
-        "slot_labels": {
-            SLOT_PRIMARY: "Control 1",
-            SLOT_SECONDARY: "Control 2",
-            SLOT_TERTIARY: "Control 3",
-            SLOT_QUATERNARY: "Control 4",
-            SLOT_QUINARY: "Control 5",
-            SLOT_SENARY: "Control 6",
-            SLOT_SEPTENARY: "Control 7",
-            SLOT_OCTONARY: "Control 8",
-        },
-    }
+    if "multi_service" not in TEMPLATES:
+        TEMPLATES["multi_service"] = dict(_MULTI_SERVICE_TEMPLATE_FALLBACK)
 
 
 def _accessory_type_to_template_id(accessory_type: str) -> str | None:
@@ -334,8 +356,9 @@ def _pick_fallback_template_id(entity_ids: list[str]) -> str | None:
     domains = [eid.split(".", 1)[0] for eid in entity_ids if "." in eid]
 
     # Multiple entities (2–8) of any supported type → generic multi-service
-    if len(entity_ids) >= 2 and "multi_service" in TEMPLATES:
-        if set(domains) & set(MULTI_SERVICE_DOMAIN_TO_PLATFORM):
+    if len(entity_ids) >= 2:
+        _ensure_multi_service_template()
+        if "multi_service" in TEMPLATES and (set(domains) & _MULTI_SERVICE_DOMAINS):
             return "multi_service"
     # Prefer Fan + Light combo if both fan and light are selected
     if "fan" in domains and "light" in domains and "fan_light" in TEMPLATES:
